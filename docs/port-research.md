@@ -547,6 +547,7 @@ moon-templ/                      # 本仓库(monorepo,三个 module 或一个 mo
 
 1. **AST 节点自带 `Write(w, indent)`** —— 一套 AST 同时支撑 codegen / fmt / LSP。
 2. **`RangeWriter` 两态写入** —— 累积字面量 vs 写代码,约 130 行,是 codegen 的骨架;字面量合并 + 全文件共享下标是性能与热重载的基础。
+   - 已落地为 `generator/rangewriter.mbt`(T2.7)。**一处与 templ 的差异**:templ 把下标发进产物(`WriteString(buf, 2, "...")`),因为它的运行时靠下标在 watch 模式下从 `.templ` 源文件里换字符串;我们的 runtime 没有这层,所以产物只写 `w.write_string("...")`(与 §3.2 原型一致),下标改为**只记录在 `RangeWriter::literals()` 里**——`generator -lazy` 的文件级变更检测(T3.9)直接用这个数组。等到做 `--watch`(T5.3)时再把下标发进产物即可,反正产物本来就是重新生成的。
 3. **`VarN` 全局唯一命名 + 私有前缀** —— templ 的 `7745c5c3` 前缀纯粹是避免与用户代码撞名,MoonBit 换自己的前缀即可(如 `mt_`)。
 
 **两条 MoonBit 特有的实现建议:**
