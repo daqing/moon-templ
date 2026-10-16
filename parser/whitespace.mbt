@@ -70,7 +70,7 @@ pub fn is_block_element(name : String) -> Bool {
 /// node, which is what `normalize_block_whitespace` reproduces.
 pub fn is_inline(node : Node) -> Bool {
   match node {
-    Text(_) | StringExpression(_) | If(_) | For(_) => true
+    Text(_) | StringExpression(_) | If(_) | For(_) | Match(_) => true
     Element(e) => !is_block_element(e.name)
     _ => false
   }
@@ -103,13 +103,13 @@ pub fn normalize_whitespace(nodes : Array[Node]) -> Array[Node] {
 
 ///|
 /// Normalize the nodes of a block body: the children of a component call, the
-/// branches of an `if`, and the body of a `for`.
+/// branches of an `if`, the body of a `for`, and the arms of a `match`.
 ///
 /// templ keeps every whitespace node of an element's children or a template body
 /// but only the ones inside a block body, and the difference shows in the one
-/// place a whitespace node comes from: `{ children... }`, an `if` and a `for` do
-/// not take the run after them the way every other node does, so that run is a
-/// node of the list. In a block it is a space of its own — `@c() { { children... } x }`
+/// place a whitespace node comes from: `{ children... }` and a statement do not
+/// take the run after them the way every other node does, so that run is a node
+/// of the list. In a block it is a space of its own — `@c() { { children... } x }`
 /// renders `" x"` — while in an element or a template body it is dropped, so
 /// `<p>{ children... } x</p>` renders `"x"`.
 pub fn normalize_block_whitespace(nodes : Array[Node]) -> Array[Node] {
@@ -330,10 +330,27 @@ fn resolve_bodies(
     match piece {
       Nested(If(expr)) => out.push(Nested(If(normalize_if(expr, next))))
       Nested(For(expr)) => out.push(Nested(For(normalize_for(expr, next))))
+      Nested(Match(expr)) =>
+        out.push(Nested(Match(normalize_match(expr, next))))
       _ => out.push(piece)
     }
   }
   out
+}
+
+///|
+/// Every arm of a `match` is a block body written to the statement's next
+/// sibling, `after`.
+fn normalize_match(expr : MatchExpression, after : Piece?) -> MatchExpression {
+  {
+    subject: expr.subject,
+    arms: expr.arms.map(fn(arm) {
+      {
+        pattern: arm.pattern,
+        children: normalize(arm.children, block=true, after~),
+      }
+    }),
+  }
 }
 
 ///|
@@ -404,7 +421,7 @@ fn is_self_closing_call(piece : Piece) -> Bool {
 /// closing brace, and a `{ children... }` whose output the caller decides.
 fn leaves_trailing_space_to_list(piece : Piece) -> Bool {
   match piece {
-    Nested(If(_)) | Nested(For(_)) => true
+    Nested(If(_)) | Nested(For(_)) | Nested(Match(_)) => true
     Nested(ChildrenExpression) => true
     _ => false
   }

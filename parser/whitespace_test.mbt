@@ -61,6 +61,10 @@ fn preview_nodes(nodes : Array[@parser.Node], buf : StringBuilder) -> Unit {
         preview_nodes(expr.else_, buf)
       }
       For(expr) => preview_nodes(expr.children, buf)
+      Match(expr) =>
+        for arm in expr.arms {
+          preview_nodes(arm.children, buf)
+        }
     }
   }
 }

@@ -1572,3 +1572,162 @@ test "differential: whitespace around a for statement" {
     "<i>c</i> <i>d</i>",
   )
 }
+
+///|
+// Generated from templ v0.3.1070 by the differential probe: each
+// expected string is the concatenation of the string literals templ's own
+// generator emits for that template body, with `§` standing in for the value
+// of an expression. The inputs are spelled the way moon-templ spells a
+// match; the probe was given templ's own `switch` spelling of the same tree.
+test "differential: whitespace around a match statement" {
+  assert_eq(
+    preview("match x {\n\"a\" => {\n<i>c</i>\n}\n_ => {\n<i>d</i>\n}\n}"),
+    "<i>c</i><i>d</i>",
+  )
+  assert_eq(
+    preview("match x {\n\"a\" => {\n<i>c</i>\n}\n_ => {\n<i>d</i>\n}\n}x"),
+    "<i>c</i> <i>d</i> x",
+  )
+  assert_eq(
+    preview("match x {\n\"a\" => {\n<i>c</i>\n}\n_ => {\n<i>d</i>\n}\n}\ntail"),
+    "<i>c</i> <i>d</i> tail",
+  )
+  assert_eq(
+    preview(
+      "<p>a</p>\nmatch x {\n\"a\" => {\n<i>c</i>\n}\n_ => {\n<i>d</i>\n}\n}",
+    ),
+    "<p>a</p><i>c</i><i>d</i>",
+  )
+  assert_eq(
+    preview(
+      "<div>\nmatch x {\n\"a\" => {\n<i>c</i>\n}\n_ => {\n<i>d</i>\n}\n}\n</div>",
+    ),
+    "<div><i>c</i><i>d</i></div>",
+  )
+  assert_eq(
+    preview(
+      "<p>\nmatch x {\n\"a\" => {\n<i>c</i>\n}\n_ => {\n<i>d</i>\n}\n}\n</p>",
+    ),
+    "<p><i>c</i><i>d</i></p>",
+  )
+  assert_eq(
+    preview("a\nmatch x {\n\"a\" => {\n<i>c</i>\n}\n_ => {\n<i>d</i>\n}\n}\nb"),
+    "a <i>c</i> <i>d</i> b",
+  )
+  assert_eq(
+    preview(
+      "<i>a</i> match x {\n\"a\" => {\n<i>c</i>\n}\n_ => {\n<i>d</i>\n}\n}",
+    ),
+    "<i>a</i> <i>c</i><i>d</i>",
+  )
+  assert_eq(
+    preview(
+      "<i>a</i> match x {\n\"a\" => {\n<i>c</i>\n}\n_ => {\n<i>d</i>\n}\n}x",
+    ),
+    "<i>a</i> <i>c</i> <i>d</i> x",
+  )
+  assert_eq(
+    preview(
+      "@c() {\nmatch x {\n\"a\" => {\n<i>c</i>\n}\n_ => {\n<i>d</i>\n}\n}\n}",
+    ),
+    "<i>c</i><i>d</i>",
+  )
+  assert_eq(
+    preview(
+      "@shell() {\nmatch x {\n\"a\" => {\n<i>c</i>\n}\n_ => {\n<i>d</i>\n}\n}\nx\n}",
+    ),
+    "<i>c</i><i>d</i> x",
+  )
+  assert_eq(
+    preview("\nmatch x {\n\"a\" => {\n<i>c</i>\n}\n_ => {\n<i>d</i>\n}\n}"),
+    "<i>c</i><i>d</i>",
+  )
+  assert_eq(
+    preview("match x {\n\"a\" => {\n<i>c</i>\n}\n_ => {\n<i>d</i>\n}\n} \n"),
+    "<i>c</i><i>d</i>",
+  )
+  assert_eq(
+    preview("@c()\nmatch x {\n\"a\" => {\n<i>c</i>\n}\n_ => {\n<i>d</i>\n}\n}"),
+    "<i>c</i><i>d</i>",
+  )
+  assert_eq(
+    preview(
+      "match x {\n\"a\" => {\n<i>c</i>\n}\n_ => {\n<i>d</i>\n}\n}\nmatch x {\n\"a\" => {\n<i>c</i>\n}\n_ => {\n<i>d</i>\n}\n}",
+    ),
+    "<i>c</i> <i>d</i> <i>c</i><i>d</i>",
+  )
+  assert_eq(preview("match x {\n_ => {\n<i>d</i>\n}\n}"), "<i>d</i>")
+  assert_eq(preview("match x {\n\"a\" => {\n<i>c</i>\n}\n}"), "<i>c</i>")
+  assert_eq(
+    preview("match x {\n\"a\" => {\ntail\n}\n_ => {\n<i>d</i>\n}\n}"),
+    "tail<i>d</i>",
+  )
+  assert_eq(
+    preview("match x {\n\"a\" => {\n<p>a</p>\n}\n_ => {\n<i>d</i>\n}\n}"),
+    "<p>a</p><i>d</i>",
+  )
+  assert_eq(
+    preview("match x {\n\"a\" => {\n@c()\n}\n_ => {\n<i>d</i>\n}\n}"),
+    "<i>d</i>",
+  )
+  assert_eq(
+    preview("match x {\n\"a\" => {\n{ children... }\n}\n_ => {\n<i>d</i>\n}\n}"),
+    "<i>d</i>",
+  )
+  assert_eq(
+    preview("match x {\n\"a\" => {\n\n}\n_ => {\n<i>d</i>\n}\n}"),
+    "<i>d</i>",
+  )
+  assert_eq(
+    preview("match x {\n\"a\" => {\n<i>c</i>\n}\n_ => {\n\n}\n}"),
+    "<i>c</i>",
+  )
+  assert_eq(
+    preview("match x {\n\"a\" => {\n  <i>c</i>\n}\n_ => {\n<i>d</i>\n}\n}"),
+    "<i>c</i><i>d</i>",
+  )
+  assert_eq(
+    preview("match x {\n\"a\" => {\n\t<i>c</i>\n}\n_ => {\n<i>d</i>\n}\n}"),
+    "<i>c</i><i>d</i>",
+  )
+  assert_eq(
+    preview("match x {\n\"a\" => {\n <i>c</i> \n}\n_ => {\n<i>d</i>\n}\n}"),
+    "<i>c</i><i>d</i>",
+  )
+  assert_eq(
+    preview("match x {\n\"a\" => {\nlead <i>c</i>\n}\n_ => {\n<i>d</i>\n}\n}"),
+    "lead <i>c</i><i>d</i>",
+  )
+  assert_eq(
+    preview("match x {\n\"a\" => {\n<i>c</i> tail\n}\n_ => {\n<i>d</i>\n}\n}"),
+    "<i>c</i> tail<i>d</i>",
+  )
+  assert_eq(
+    preview("match x {\n\"a\" => {\n{ x }\n}\n_ => {\n<i>d</i>\n}\n}"),
+    "§<i>d</i>",
+  )
+  assert_eq(
+    preview(
+      "match x {\n\"a\" => {\nif x == \"a\" {\n<i>c</i>\n}\n}\n_ => {\n<i>d</i>\n}\n}",
+    ),
+    "<i>c</i><i>d</i>",
+  )
+  assert_eq(
+    preview(
+      "match x {\n\"a\" => {\nfor v in items {\n<i>c</i>\n}\n}\n_ => {\n<i>d</i>\n}\n}",
+    ),
+    "<i>c</i><i>d</i>",
+  )
+  assert_eq(
+    preview(
+      "match x {\n\"a\" => {\nmatch x {\n\"b\" => {\n<i>c</i>\n}\n_ => {\n<i>d</i>\n}\n}\n}\n_ => {\n<i>d</i>\n}\n}",
+    ),
+    "<i>c</i><i>d</i><i>d</i>",
+  )
+  assert_eq(
+    preview(
+      "match x {\n\"a\" => {\n<i>c</i>\n}\n_ => {\n<i>d</i>\n}\n}\nif x == \"a\" {\n<i>e</i>\n}",
+    ),
+    "<i>c</i> <i>d</i> <i>e</i>",
+  )
+}

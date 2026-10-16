@@ -137,75 +137,80 @@ fn scan_expr(
 }
 
 ///|
-/// Scan the head of a statement block: everything up to the `{` that opens it,
-/// which is left where it stands. Both an `if` condition and a `for` head are
-/// read this way. It is the same scan as `scan_expr` with the same corners — a
-/// bracket that nests, a `{` inside a string, a rune or a comment — ending at the
-/// other brace. `None` when the source runs out first, which means the statement
-/// never opened a block.
+/// Scan the head of a statement: everything up to the marker that ends it, which
+/// is left where it stands, so `stop` is asked at each character and answers
+/// whether this is that marker. An `if` condition, a `for` head and a `match`
+/// subject end at the `{` that opens their block; the pattern of a `match` arm
+/// ends at the `=>` in front of its own.
+///
+/// It is the same scan as `scan_expr` with the same corners — a bracket that
+/// nests, a marker inside a string, a rune or a comment is part of the head —
+/// ending at the marker itself. `None` when the source runs out first, which
+/// means the statement never reached it.
 fn scan_head(
   src : StringView,
   depth : Int32,
   buf : StringBuilder,
+  stop : (StringView) -> Bool,
 ) -> StringView? {
   match src {
     [] => None
-    ['{', ..] if depth == 0 => Some(src)
+    _ if depth == 0 && stop(src) => Some(src)
     ['{', .. rest] => {
       buf.write_char('{')
-      scan_head(rest, depth + 1, buf)
+      scan_head(rest, depth + 1, buf, stop)
     }
     ['(', .. rest] => {
       buf.write_char('(')
-      scan_head(rest, depth + 1, buf)
+      scan_head(rest, depth + 1, buf, stop)
     }
     ['[', .. rest] => {
       buf.write_char('[')
-      scan_head(rest, depth + 1, buf)
+      scan_head(rest, depth + 1, buf, stop)
     }
     [')', .. rest] => {
       buf.write_char(')')
-      scan_head(rest, dec(depth), buf)
+      scan_head(rest, dec(depth), buf, stop)
     }
     [']', .. rest] => {
       buf.write_char(']')
-      scan_head(rest, dec(depth), buf)
+      scan_head(rest, dec(depth), buf, stop)
     }
     ['}', .. rest] => {
       buf.write_char('}')
-      scan_head(rest, dec(depth), buf)
+      scan_head(rest, dec(depth), buf, stop)
     }
     ['"', .. rest] => {
       buf.write_char('"')
       match scan_string(rest, buf) {
         None => None
-        Some(r) => scan_head(r, depth, buf)
+        Some(r) => scan_head(r, depth, buf, stop)
       }
     }
     ['\'', .. rest] => {
       buf.write_char('\'')
       match scan_rune(rest, buf) {
         None => None
-        Some(r) => scan_head(r, depth, buf)
+        Some(r) => scan_head(r, depth, buf, stop)
       }
     }
     ['/', '/', .. rest] => {
       buf.write_string("//")
       match scan_line_comment(rest, buf) {
         None => None
-        Some(r) => scan_head(r, depth, buf)
+        Some(r) => scan_head(r, depth, buf, stop)
       }
     }
     ['/', '*', .. rest] => {
       buf.write_string("/*")
       match scan_block_comment(rest, buf) {
         None => None
-        Some(r) => scan_head(r, depth, buf)
+        Some(r) => scan_head(r, depth, buf, stop)
       }
     }
     [c, .. rest] => {
       buf.write_char(c)
-      scan_head(rest, depth, buf)
+      scan_head(rest, depth, buf, stop)
     }
   }
 }

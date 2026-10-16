@@ -90,12 +90,29 @@ pub fn IfExpression::equal(Self, Self) -> Bool
 pub fn IfExpression::not_equal(Self, Self) -> Bool
 pub fn IfExpression::to_repr(Self) -> @debug.Repr
 
+pub(all) struct MatchArm {
+  pattern : String
+  children : Array[Node]
+} derive(Eq, @debug.Debug)
+pub fn MatchArm::equal(Self, Self) -> Bool
+pub fn MatchArm::not_equal(Self, Self) -> Bool
+pub fn MatchArm::to_repr(Self) -> @debug.Repr
+
+pub(all) struct MatchExpression {
+  subject : String
+  arms : Array[MatchArm]
+} derive(Eq, @debug.Debug)
+pub fn MatchExpression::equal(Self, Self) -> Bool
+pub fn MatchExpression::not_equal(Self, Self) -> Bool
+pub fn MatchExpression::to_repr(Self) -> @debug.Repr
+
 pub(all) enum Node {
   DocType(String)
   HTMLComment(String)
   Call(Call)
   If(IfExpression)
   For(ForExpression)
+  Match(MatchExpression)
   Element(Element)
   RawElement(RawElement)
   Text(String)

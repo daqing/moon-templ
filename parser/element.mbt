@@ -118,8 +118,8 @@ fn parse_nodes_into(
 ///
 /// templ gives the whitespace that trails a node to that node, so a node the
 /// whitespace does not belong to begins at its first character — which is what
-/// makes `@` start a call and `if` or `for` a statement even in the middle of a
-/// line, as long as a node ends before them. Read on its own, the run stays a gap that
+/// makes `@` start a call and a statement keyword a statement even in the middle
+/// of a line, as long as a node ends before them. Read on its own, the run stays a gap that
 /// collapses, rather than the spaces of a line of text that survive verbatim; a
 /// node list that starts with the run has nobody before it to take that
 /// whitespace, which is why the run has to be read rather than left to end the
@@ -217,9 +217,12 @@ fn take_text(
 /// guesses from the keyword alone and errors when what follows is not one, which
 /// is why `if you like`, or `for the best`, opening a line is a parse error
 /// rather than a sentence — the escape is to put the word in an expression,
-/// `{ "if" }`.
+/// `{ "if" }`. templ also guesses `switch `; moon-templ guesses `match `, the
+/// keyword its own syntax uses.
 fn starts_statement(src : StringView) -> Bool {
-  src.has_prefix("if "[:]) || src.has_prefix("for "[:])
+  src.has_prefix("if "[:]) ||
+  src.has_prefix("for "[:]) ||
+  src.has_prefix("match "[:])
 }
 
 ///|
@@ -230,8 +233,10 @@ fn parse_statement(
 ) -> (Node, StringView) raise ParseError {
   if src.has_prefix("if "[:]) {
     parse_if(src, offset)
-  } else {
+  } else if src.has_prefix("for "[:]) {
     parse_for(src, offset)
+  } else {
+    parse_match(src, offset)
   }
 }
 

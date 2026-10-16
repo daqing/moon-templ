@@ -17,7 +17,7 @@ fn open_block(
   what~ : String,
 ) -> (String, StringView) raise ParseError {
   let buf = StringBuilder()
-  let at_brace = match scan_head(src, 0, buf) {
+  let at_brace = match scan_head(src, 0, buf, at_open_brace) {
     Some(rest) => rest
     None =>
       raise ParseError(
@@ -40,9 +40,30 @@ fn open_block(
         message=keyword + ": expected '{' after the " + what,
       )
   }
+  (head, take_block_newline(after_brace, offset, keyword~))
+}
+
+///|
+/// The marker a statement's head ends at: the `{` that opens its block, which is
+/// left where it stands for `open_block` to read.
+fn at_open_brace(src : StringView) -> Bool {
+  match src {
+    ['{', ..] => true
+    _ => false
+  }
+}
+
+///|
+/// The newline that has to follow a block's opening brace, so that the block
+/// starts on a line of its own.
+fn take_block_newline(
+  after_brace : StringView,
+  offset : Int32,
+  keyword~ : String,
+) -> StringView raise ParseError {
   match after_brace {
-    ['\n', .. rest] => (head, rest)
-    ['\r', '\n', .. rest] => (head, rest)
+    ['\n', .. rest] => rest
+    ['\r', '\n', .. rest] => rest
     _ =>
       raise ParseError(
         offset~,

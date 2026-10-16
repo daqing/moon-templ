@@ -150,6 +150,7 @@ fn reads_ctx(nodes : Array[@parser.Node]) -> Bool {
       Call(_) | ChildrenExpression => return true
       If(expr) => if any_if_body(expr, reads_ctx) { return true }
       For(expr) => if reads_ctx(expr.children) { return true }
+      Match(expr) => if any_match_arm(expr, reads_ctx) { return true }
       Element(element) => if reads_ctx(element.children) { return true }
       Text(_)
       | StringExpression(_)
@@ -175,6 +176,7 @@ fn renders_children(nodes : Array[@parser.Node]) -> Bool {
       Call(call) => if renders_children(call.children) { return true }
       If(expr) => if any_if_body(expr, renders_children) { return true }
       For(expr) => if renders_children(expr.children) { return true }
+      Match(expr) => if any_match_arm(expr, renders_children) { return true }
       Element(element) => if renders_children(element.children) { return true }
       Text(_)
       | StringExpression(_)
@@ -254,6 +256,7 @@ fn emits_output(nodes : Array[@parser.Node]) -> Bool {
       Text(text) => if !text.is_empty() { return true }
       If(expr) => if any_if_body(expr, emits_output) { return true }
       For(expr) => if emits_output(expr.children) { return true }
+      Match(expr) => if any_match_arm(expr, emits_output) { return true }
       Call(_)
       | ChildrenExpression
       | Element(_)
@@ -372,6 +375,7 @@ fn mentions_in(nodes : Array[@parser.Node], name : String) -> Bool {
           mentions_in(expr.children, name) {
           return true
         }
+      Match(expr) => if match_mentions(expr, name) { return true }
       ChildrenExpression => ()
       Element(element) =>
         if mentions_in_attrs(element.attrs, name) ||
@@ -380,6 +384,24 @@ fn mentions_in(nodes : Array[@parser.Node], name : String) -> Bool {
         }
       RawElement(raw) => if mentions_in_attrs(raw.attrs, name) { return true }
       Text(_) | HTMLComment(_) | DocType(_) => ()
+    }
+  }
+  false
+}
+
+///|
+/// Whether a `match` reads `name`: in its subject, in one of its patterns, or
+/// anywhere in one of its arm bodies. The subject and the patterns are copied
+/// into the generated file as they stand, and a pattern is where an arm's
+/// variables are named, so a parameter read only there is still read.
+fn match_mentions(expr : @parser.MatchExpression, name : String) -> Bool {
+  if mentions(expr.subject[:], name[:], None) {
+    return true
+  }
+  for arm in expr.arms {
+    if mentions(arm.pattern[:], name[:], None) ||
+      mentions_in(arm.children, name) {
+      return true
     }
   }
   false
@@ -458,6 +480,7 @@ fn Generator::write_node(
     Call(call) => self.write_call(call, level)
     If(expr) => self.write_if(expr, level)
     For(expr) => self.write_for(expr, level)
+    Match(expr) => self.write_match(expr, level)
     ChildrenExpression => self.write_children_expression(level)
     Element(element) => self.write_element(element, level)
     RawElement(raw) => self.write_raw_element(raw, level)
@@ -548,6 +571,41 @@ fn Generator::write_for(
   self.w.write_indent(level, "for " + expr.expression + " {\n")
   self.write_nodes(expr.children, level + 1)
   self.w.write_indent(level, "}\n")
+}
+
+///|
+/// A `match` and its arms, written as the same statement in MoonBit: templ's
+/// `case x:` becomes `x => {`, and its `default:` becomes `_ => {`. The subject
+/// and every pattern are template source copied through as they stand — what a
+/// match may ask and what a pattern may hold are MoonBit's own, so the compiler
+/// that reads the generated file is the one that checks them, and a pattern that
+/// destructures, `Some(v) => { ... }`, is written the same way here.
+fn Generator::write_match(
+  self : Generator,
+  expr : @parser.MatchExpression,
+  level : Int32,
+) -> Unit raise GenerateError {
+  self.w.write_indent(level, "match " + expr.subject + " {\n")
+  for arm in expr.arms {
+    self.w.write_indent(level + 1, arm.pattern + " => {\n")
+    self.write_nodes(arm.children, level + 2)
+    self.w.write_indent(level + 1, "}\n")
+  }
+  self.w.write_indent(level, "}\n")
+}
+
+///|
+/// Whether any of a `match`'s arm bodies satisfies `predicate`.
+fn any_match_arm(
+  expr : @parser.MatchExpression,
+  predicate : (Array[@parser.Node]) -> Bool,
+) -> Bool {
+  for arm in expr.arms {
+    if predicate(arm.children) {
+      return true
+    }
+  }
+  false
 }
 
 ///|

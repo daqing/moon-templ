@@ -12,6 +12,8 @@ pub(all) enum Node {
   If(IfExpression)
   /// `for head { ... }`, in either of the two forms MoonBit writes.
   For(ForExpression)
+  /// `match subject { pattern => { ... } }`.
+  Match(MatchExpression)
   Element(Element)
   RawElement(RawElement)
   Text(String)
@@ -61,6 +63,27 @@ pub(all) struct ElseIf {
 /// copied through as it stands for the compiler to check.
 pub(all) struct ForExpression {
   expression : String
+  children : Array[Node]
+} derive(Debug, Eq)
+
+///|
+/// `match subject { pattern => { ... } }`, templ's `switch` written the way
+/// MoonBit writes it: templ's `case x:` becomes an arm `x => {`, and its
+/// `default:` becomes `_ => {`. The arm body is a block of its own, so a branch
+/// holds a template's nodes rather than an expression — which is what lets a
+/// pattern destructure, as in `Some(v) => { ... }`.
+///
+/// `subject` and every `pattern` are the source text between the markers, copied
+/// through as they stand for the compiler to check.
+pub(all) struct MatchExpression {
+  subject : String
+  arms : Array[MatchArm]
+} derive(Debug, Eq)
+
+///|
+/// One `pattern => { ... }` of a `match`.
+pub(all) struct MatchArm {
+  pattern : String
   children : Array[Node]
 } derive(Debug, Eq)
 
@@ -136,6 +159,18 @@ pub extend ForExpression with Eq::{equal, not_equal}
 
 ///|
 pub extend ForExpression with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend MatchExpression with Eq::{equal, not_equal}
+
+///|
+pub extend MatchExpression with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend MatchArm with Eq::{equal, not_equal}
+
+///|
+pub extend MatchArm with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
 pub extend Element with Eq::{equal, not_equal}
