@@ -37,6 +37,11 @@ fn preview_nodes(nodes : Array[@parser.Node], buf : StringBuilder) -> Unit {
       }
       HTMLComment(_) => buf.write_string("<!---->")
       DocType => buf.write_string("<!doctype html>")
+      RawElement(e) => {
+        buf.write_string("<" + e.name + ">")
+        buf.write_string(e.contents)
+        buf.write_string("</" + e.name + ">")
+      }
     }
   }
 }
@@ -147,5 +152,14 @@ test "a whitespace-only node collapses however long it is" {
   assert_eq(
     preview("<span>a</span>\n\n<span>b</span>"),
     "<span>a</span> <span>b</span>",
+  )
+}
+
+///|
+test "whitespace inside a raw element is left exactly as written" {
+  assert_eq(preview("<style>\n  a  b\n</style>"), "<style>\n  a  b\n</style>")
+  assert_eq(
+    preview("<div>\n  <script>var a = 1;\n  var b = 2;</script>\n</div>"),
+    "<div><script>var a = 1;\n  var b = 2;</script></div>",
   )
 }

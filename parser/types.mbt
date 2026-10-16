@@ -4,6 +4,7 @@ pub(all) enum Node {
   DocType
   HTMLComment(String)
   Element(Element)
+  RawElement(RawElement)
   Text(String)
   StringExpression(String)
 } derive(Debug, Eq)
@@ -14,6 +15,16 @@ pub(all) struct Element {
   attrs : Array[Attribute]
   children : Array[Node]
   self_closing : Bool
+} derive(Debug, Eq)
+
+///|
+/// An element whose contents are not template syntax. `<style>` and `<script>`
+/// keep whatever sits between their tags verbatim, so a `{` in CSS or a `<` in
+/// JavaScript is neither an expression nor a tag.
+pub(all) struct RawElement {
+  name : String
+  attrs : Array[Attribute]
+  contents : String
 } derive(Debug, Eq)
 
 ///|
@@ -50,6 +61,12 @@ pub extend Element with Eq::{equal, not_equal}
 
 ///|
 pub extend Element with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend RawElement with Eq::{equal, not_equal}
+
+///|
+pub extend RawElement with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
 pub extend Attribute with Eq::{equal, not_equal}

@@ -22,7 +22,7 @@ fn is_name_char(c : Char) -> Bool {
 
 ///|
 /// HTML void elements have no closing tag and no children.
-fn is_void_element(name : String) -> Bool {
+pub fn is_void_element(name : String) -> Bool {
   match name {
     "area"
     | "base"
@@ -73,7 +73,10 @@ fn parse_nodes_into(
   match src {
     [] => src
     ['<', ..] => {
-      let (node, rest) = parse_element(src, offset)
+      let (node, rest) = match raw_element_name(src) {
+        Some(name) => parse_raw_element(src, name, offset)
+        None => parse_element(src, offset)
+      }
       out.push(node)
       parse_nodes_into(rest, offset + consumed(src, rest), stop, out)
     }
@@ -167,5 +170,84 @@ fn drop_prefix(view : StringView, prefix : StringView) -> StringView {
   match view.get_view(start=prefix.length()) {
     Some(rest) => rest
     None => ""[:]
+  }
+}
+
+///|
+/// The name of a raw text element at this position, if any. Deciding it here,
+/// ahead of the general element parser, is what stops the contents of `<style>`
+/// and `<script>` from being read as template syntax.
+fn raw_element_name(view : StringView) -> String? {
+  let after_lt = match view {
+    ['<', .. rest] => rest
+    _ => return None
+  }
+  for name in ["style", "script"] {
+    if after_lt.has_prefix(name[:]) {
+      match drop_prefix(after_lt, name[:]) {
+        []
+        | [' ', ..]
+        | ['\t', ..]
+        | ['\r', ..]
+        | ['\n', ..]
+        | ['>', ..]
+        | ['/', ..] => return Some(name)
+        _ => ()
+      }
+    }
+  }
+  None
+}
+
+///|
+/// Parse a raw text element: the open tag as usual, then everything up to the
+/// closing tag as it stands.
+fn parse_raw_element(
+  src : StringView,
+  name : String,
+  offset : Int32,
+) -> (Node, StringView) raise ParseError {
+  let after_name = match src {
+    ['<', .. rest] => drop_prefix(rest, name[:])
+    _ => raise ParseError(offset~, message="expected '<'")
+  }
+  let (attrs, after_open, self_closing) = parse_attributes(after_name, offset)
+  // `<style/>` is not a raw element at all; it closes itself on the spot.
+  if self_closing {
+    return (
+      Element({ name, attrs, children: [], self_closing: true, }),
+      after_open,
+    )
+  }
+  let close = "</" + name + ">"
+  let buf = StringBuilder()
+  match take_until(after_open, close[:], buf) {
+    Some(rest) =>
+      (RawElement({ name, attrs, contents: buf.to_string(), }), rest)
+    None =>
+      raise ParseError(
+        offset~,
+        message="<" + name + ">: expected end tag not present",
+      )
+  }
+}
+
+///|
+/// Everything up to the next `close`, which is consumed. `None` when the source
+/// runs out first.
+fn take_until(
+  src : StringView,
+  close : StringView,
+  buf : StringBuilder,
+) -> StringView? {
+  if src.has_prefix(close) {
+    return Some(drop_prefix(src, close))
+  }
+  match src {
+    [] => None
+    [c, .. rest] => {
+      buf.write_char(c)
+      take_until(rest, close, buf)
+    }
   }
 }

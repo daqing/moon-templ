@@ -112,10 +112,6 @@ test "an empty component collects no literals" {
 ///|
 test "a body node with no handler is refused by name" {
   assert_eq(
-    generate_error_of("templ hello() {\n  <p>hi</p>\n}\n"),
-    "cannot generate an element node yet (in template `hello`)",
-  )
-  assert_eq(
     generate_error_of("templ hello() {\n  { name }\n}\n"),
     "cannot generate an expression node yet (in template `hello`)",
   )
@@ -124,8 +120,93 @@ test "a body node with no handler is refused by name" {
 ///|
 test "a refusal names the template the node came from" {
   assert_eq(
-    generate_error_of("templ a() {\n}\n\ntempl b() {\n  <br>\n}\n"),
-    "cannot generate an element node yet (in template `b`)",
+    generate_error_of("templ a() {\n}\n\ntempl b() {\n  { name }\n}\n"),
+    "cannot generate an expression node yet (in template `b`)",
+  )
+}
+
+///|
+/// The HTML a template renders is its literals joined; this is how the tests
+/// below read a generated file without depending on its line layout.
+fn rendered_html(src : String) -> String raise @generator.GenerateError {
+  let buf = StringBuilder()
+  for literal in @generator.generate(parse_or_abort(src)).literals {
+    buf.write_string(literal)
+  }
+  buf.to_string()
+}
+
+///|
+test "an element keeps its tags, and the ones around it merge in" {
+  assert_eq(rendered_html("templ t() {\n  <div></div>\n}\n"), "<div></div>")
+  assert_eq(
+    rendered_html("templ t() {\n  <div>Hello, <span>world</span></div>\n}\n"),
+    "<div>Hello, <span>world</span></div>",
+  )
+}
+
+///|
+test "a void element closes itself" {
+  assert_eq(rendered_html("templ t() {\n  <br/>\n}\n"), "<br>")
+  assert_eq(rendered_html("templ t() {\n  <br>\n}\n"), "<br>")
+  assert_eq(
+    rendered_html("templ t() {\n  <img src=\"x\">\n}\n"),
+    "<img src=\"x\">",
+  )
+}
+
+///|
+test "a self-closing tag on a non-void element still gets an end tag" {
+  assert_eq(rendered_html("templ t() {\n  <div/>\n}\n"), "<div></div>")
+}
+
+///|
+test "attributes are written back as they were read" {
+  assert_eq(
+    rendered_html(
+      "templ t() {\n  <div class=\"a\" id='b' data-x=c>hi</div>\n}\n",
+    ),
+    "<div class=\"a\" id=\"b\" data-x=\"c\">hi</div>",
+  )
+  assert_eq(
+    rendered_html("templ t() {\n  <input disabled>\n}\n"),
+    "<input disabled>",
+  )
+}
+
+///|
+test "an attribute value holding a quote picks the other quote" {
+  assert_eq(
+    rendered_html("templ t() {\n  <div title='say \"hi\"'>x</div>\n}\n"),
+    "<div title='say \"hi\"'>x</div>",
+  )
+}
+
+///|
+test "style and script contents are not parsed as template syntax" {
+  assert_eq(
+    rendered_html("templ t() {\n  <style>a > b { color: red }</style>\n}\n"),
+    "<style>a > b { color: red }</style>",
+  )
+  assert_eq(
+    rendered_html("templ t() {\n  <script>if (a < b) { go() }</script>\n}\n"),
+    "<script>if (a < b) { go() }</script>",
+  )
+}
+
+///|
+test "a raw element keeps its attributes and its contents verbatim" {
+  assert_eq(
+    rendered_html("templ t() {\n  <style media=\"print\">a{}</style>\n}\n"),
+    "<style media=\"print\">a{}</style>",
+  )
+}
+
+///|
+test "an element name that merely starts with a raw name is an ordinary element" {
+  assert_eq(
+    rendered_html("templ t() {\n  <scripts>hi</scripts>\n}\n"),
+    "<scripts>hi</scripts>",
   )
 }
 

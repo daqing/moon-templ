@@ -52,7 +52,7 @@ templ Script[T any](name string, data T) { <script id={ name }>{ data }</script>
 | 1 | `<!doctype html>` | `DocType` | 大小写不敏感 |
 | 2 | `<!-- ... -->` | `HTMLComment` | **输出**到 HTML,内容不得含 `--` |
 | 3 | `// ...` / `/* */` | `GoComment` | **不输出** |
-| 4 | `<text>` `<style>` `<>` | raw element | 内容完全不解析 |
+| 4 | `<style>` `<script>` | `RawElement` / `ScriptElement` | 内容完全不解析。**勘误**:templ 源码里这行的注释写的是 `<text>`,但注册的其实是 `parse.Any(styleElement, scriptElement)` —— `<text>` 与 `<>` 在 v0.3.1070 中并不存在(`elementNameParser` 也不接受空标签名),不要照注释实现 |
 | 5 | `<name ...>` | `Element` | 元素名首字符 `[a-z]`,后续 `[a-z0-9-:]` |
 | 6 | `if expr { } else if { } else { }` | `IfExpression` | `{` 后必须换行 |
 | 7 | `for ... { }` | `ForExpression` | C 风格与 range 都支持 |

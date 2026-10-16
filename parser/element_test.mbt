@@ -129,3 +129,55 @@ test "text around an expression becomes separate nodes" {
 test "a lone expression is a single node" {
   assert_eq(parse("{ x }"), [StringExpression(" x ")])
 }
+
+///|
+/// A raw text element: its contents are not template syntax.
+fn raw(name : String, contents : String) -> @parser.Node {
+  RawElement({ name, attrs: [], contents, })
+}
+
+///|
+test "style contents are taken verbatim" {
+  assert_eq(parse("<style>a>b{}</style>"), [raw("style", "a>b{}")])
+  assert_eq(parse("<style></style>"), [raw("style", "")])
+}
+
+///|
+test "script contents are taken verbatim" {
+  assert_eq(parse("<script>if (a<b) { go() }</script>"), [
+    raw("script", "if (a<b) { go() }"),
+  ])
+}
+
+///|
+test "a raw element keeps its attributes" {
+  assert_eq(parse("<style media=\"print\">a{}</style>"), [
+    @parser.RawElement({
+      name: "style",
+      attrs: [@parser.Constant(name="media", value="print")],
+      contents: "a{}",
+    }),
+  ])
+}
+
+///|
+test "a raw element name that is only a prefix is an ordinary element" {
+  assert_eq(parse("<scripts>hi</scripts>"), [el("scripts", [Text("hi")], false)])
+  assert_eq(parse("<styles></styles>"), [el("styles", [], false)])
+}
+
+///|
+test "a self-closing raw element name is not raw" {
+  assert_eq(parse("<style/>"), [el("style", [], true)])
+}
+
+///|
+test "an unclosed raw element is an error" {
+  assert_eq(
+    error_of("<style>a{}"),
+    @parser.ParseError(
+      offset=0,
+      message="<style>: expected end tag not present",
+    ),
+  )
+}

@@ -115,9 +115,71 @@ fn Generator::write_node(
     DocType => self.w.write_literal(level, "<!doctype html>")
     HTMLComment(contents) =>
       self.w.write_literal(level, "<!--" + contents + "-->")
+    Element(element) => self.write_element(element, level)
+    RawElement(raw) => self.write_raw_element(raw, level)
     Text(text) => self.w.write_literal(level, text)
-    Element(_) => refuse("an element", self.location())
     StringExpression(_) => refuse("an expression", self.location())
+  }
+}
+
+///|
+/// A start tag, the children, and an end tag, all through the literal buffer so
+/// a run of them collapses into one `w.write_string` call.
+fn Generator::write_element(
+  self : Generator,
+  element : @parser.Element,
+  level : Int32,
+) -> Unit raise GenerateError {
+  self.write_open_tag(element.name, element.attrs, level)
+  // `<br>` and friends have no children and no end tag. A self-closing tag on
+  // anything else still gets one: `<div/>` is `<div></div>`.
+  if @parser.is_void_element(element.name) && element.children.is_empty() {
+    return
+  }
+  self.write_nodes(element.children, level + 1)
+  self.w.write_literal(level, "</" + element.name + ">")
+}
+
+///|
+fn Generator::write_raw_element(
+  self : Generator,
+  raw : @parser.RawElement,
+  level : Int32,
+) -> Unit {
+  self.write_open_tag(raw.name, raw.attrs, level)
+  self.w.write_literal(level, raw.contents)
+  self.w.write_literal(level, "</" + raw.name + ">")
+}
+
+///|
+fn Generator::write_open_tag(
+  self : Generator,
+  name : String,
+  attrs : Array[@parser.Attribute],
+  level : Int32,
+) -> Unit {
+  self.w.write_literal(level, "<" + name)
+  for attr in attrs {
+    self.write_attribute(attr, level)
+  }
+  self.w.write_literal(level, ">")
+}
+
+///|
+/// Attributes are written as they were read, except for the quoting: the source
+/// quotes are not kept in the AST, so the generator picks the one that leaves the
+/// value intact.
+fn Generator::write_attribute(
+  self : Generator,
+  attr : @parser.Attribute,
+  level : Int32,
+) -> Unit {
+  match attr {
+    Constant(name~, value~) => {
+      let quote = if value.contains("\"") { "'" } else { "\"" }
+      self.w.write_literal(level, " " + name + "=" + quote + value + quote)
+    }
+    Bool(name~) => self.w.write_literal(level, " " + name)
   }
 }
 

@@ -4,7 +4,7 @@
 拆分日期:2026-10-17
 目标:把 `a-h/templ` 的模板引擎在 MoonBit 中重新实现
 
-**进度:21 / 55**
+**进度:22 / 56**
 
 ---
 
@@ -17,7 +17,7 @@
   |---|---|---|---|
   | T0 决策与准备 | 5 | 5 | 0 |
   | T1 runtime 地基 | 5 | 5 | 0 |
-  | T2 parser + generator 骨架 | 16 | 11 | 0 |
+  | T2 parser + generator 骨架 | 17 | 12 | 0 |
   | T3 MVP 完整 | 11 | 0 | 0 |
   | T4 属性特殊语义 | 8 | 0 | 0 |
   | T5 工具链与打磨 | 5 | 0 | 1(T5.2) |
@@ -74,11 +74,17 @@
 - [x] **T2.11** 字面量发射:把 `RangeWriter` 接进 generator — 单测:`<div>` + 文本 + `<span>` 合并成**一个** `write_string`,不是三次 · 前置 T2.7、T2.8、T2.9 · M
   - 文本、HTML 注释、doc type 三类节点都走 `RangeWriter`,相邻字面量自然并成一句 `w.write_string`;已实测生成物可编译并渲染出正确 HTML(`<!doctype html><!-- a page -->hi`)。
   - 偏差:任务里写的是 `<div>`+文本+`<span>` 合并,但元素节点要等 **T2.12**;当前用 `Text` + `HTMLComment` + `Text` 三种相邻节点验证合并,元素版本挪到 T2.12 一起补。
-- [ ] **T2.12** 元素节点发射:起止标签、自闭合、void 元素 — 单测:`<div></div>` / `<br/>` / `<img src="x">` 三种产物都正确。**同时补 T2.3 留下的缺口:裸文本元素** `<>` `<text>` `<style>` `<script>`,其内容不按标签/表达式解析(T2.3 目前会把 `<style>a>b{}</style>` 误解析)· 前置 T2.3、T2.11 · M
+- [x] **T2.12** 元素节点发射:起止标签、自闭合、void 元素 — 单测:`<div></div>` / `<br/>` / `<img src="x">` 三种产物都正确。**同时补 T2.3 留下的缺口:裸文本元素** `<>` `<text>` `<style>` `<script>`,其内容不按标签/表达式解析(T2.3 目前会把 `<style>a>b{}</style>` 误解析)· 前置 T2.3、T2.11 · M
+  - 元素与属性都走字面量缓冲,`<div class="a">Hello, <span>world</span></div>` 整段并成**一句** `w.write_string`(即 T2.11 欠下的那半个用例,现已补上)。
+  - 新增 `RawElement` 节点承接 `<style>`/`<script>`:内容原样收进 `contents`,既不解析标签也不解析 `{ expr }`,空白归一化也跳过它(否则 CSS/JS 里的空白会被折叠掉)。
+  - **偏差一**:任务里写的 `<text>` 与 `<>` 在 templ v0.3.1070 中**并不存在** —— 源码那行的注释是过时的,实际注册的是 `parse.Any(styleElement, scriptElement)`。已把勘误记进 port-research §1.1,只实现 `<style>`/`<script>`。
+  - **偏差二**:`<script>` 暂时按 `rawElementParser` 的朴素做法扫到 `</script>`;templ 对 `type` 是 JS 的 `<script>` 另有 JS 字符串/注释感知的扫描器(`parser/v2/scriptparser.go`,约 200 行),留到后续任务。
+  - **偏差三**:`Attribute.Constant` 没有保留源码引号(T2.4 未记录),生成时统一用 `"`,仅当值里真的含 `"` 时退化成 `'`,以免生成出坏 HTML。
 - [ ] **T2.13** 表达式节点发射:`{ expr }` → `@rt.write_any(w, expr)` — 单测:`Hello, { name }` 产物是**两段字面量夹一次** `write_any` · 前置 T2.2、T2.11、T1.3 · M
 - [ ] **T2.14** CLI 骨架:`moon-templ generate <file.templ>` 单文件 — 产出 `x_templ.mbt`。注意 `args[0]` 是构建产物路径,真实参数从 `args[1]` 起 · 前置 T2.13 · M
 - [ ] **T2.15** **端到端 M1**:手写 `examples/hello/hello.templ` 全链路跑通 — 生成 → `moon build` → 运行 → HTML 输出逐字节正确;写成可重复执行的集成测试 · 前置 T2.14 · S
 - [ ] **T2.16** 生成后内联 `@fmt.format` 规范化产物 — 产物格式规范、`///|` 块分隔齐全(port-research §6)· 前置 T2.15 · S
+- [ ] **T2.17** 解析 `<!doctype html>` 与 `<!-- ... -->`(parser 侧)— T2.11 已经能**发射**这两类节点,但 parser 一个都产生不出来,现在只能从手搭 AST 测;不加这段,真实页面里的 doctype 会直接报"element name must start with a lowercase letter: !"。同时给 T2.11 的 `HTMLComment` 内容定案:templ 的 `Contents` **不含** `<!--`/`-->`,只有中间那段 · 前置 T2.4 · S
 
 ---
 
