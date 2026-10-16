@@ -1,0 +1,42 @@
+templ show_all() {
+  @a()
+  @b(c("C"))
+  @d()
+  @show_one(e())
+  @wrap_children() {
+    <div>Child content</div>
+  }
+}
+
+templ a() {
+  <div>A</div>
+}
+
+templ b(child : @rt.Component) {
+  <div>B</div>
+  @child
+}
+
+templ c(text : String) {
+  <div>{ text }</div>
+}
+
+templ d() {
+  <div>Legacy call style</div>
+}
+
+templ e() {
+  e
+}
+
+templ show_one(component : @rt.Component) {
+  <div>
+    @component
+  </div>
+}
+
+templ wrap_children() {
+  <div id="wrapper">
+    { children... }
+  </div>
+}

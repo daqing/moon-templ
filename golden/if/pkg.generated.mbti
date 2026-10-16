@@ -1,0 +1,22 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "daqing/moon-templ/golden/if"
+
+import {
+  "daqing/moon-templ/runtime",
+}
+
+// Values
+pub fn render(Data) -> @runtime.Component
+
+// Errors
+
+// Types and methods
+pub struct Data {
+  value : Bool
+}
+pub fn Data::is_true(Self) -> Bool
+pub fn Data::new(Bool) -> Self
+
+// Type aliases
+
+// Traits

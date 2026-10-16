@@ -4,7 +4,7 @@
 拆分日期:2026-10-17
 目标:把 `a-h/templ` 的模板引擎在 MoonBit 中重新实现
 
-**进度:39 / 58**
+**进度:40 / 58**
 
 ---
 
@@ -18,7 +18,7 @@
   | T0 决策与准备 | 5 | 5 | 0 |
   | T1 runtime 地基 | 5 | 5 | 0 |
   | T2 parser + generator 骨架 | 19 | 19 | 0 |
-  | T3 MVP 完整 | 11 | 10 | 0 |
+  | T3 MVP 完整 | 11 | 11 | 0 |
   | T4 属性特殊语义 | 8 | 0 | 0 |
   | T5 工具链与打磨 | 5 | 0 | 1(T5.2) |
   | T6 可选 / 远期 | 5 | 0 | 3 |
@@ -154,7 +154,14 @@
   - 实测证据:`moon check` 零警告;`moon test` **316 passed / 0 failed**(较 T3.9 的 312 多出 3 个 example 测试 + 1 个守卫测试);`moon run examples/site` 打出的整页与断言逐字节相同;再跑一次 `generate examples/site/...` 三份产物都报 `is up to date` 且 mtime 不变(产物是 `moon fmt` 的不动点,`formatter(ignore:)` 覆盖了新包的两个产物)。
   - **仍然存在的运行时缺口(非本次引入)**:T3.7 生成的 `@rt.render_attributes` 要等 **T4.1** 才有实现,所以这个页面**故意不用** `{ attrs... }`;`{ attrs... }` 现在能解析、能生成,但产物要等 T4.1 才编得过(此前 spread 是解析错误,所以没有回归)。
   - **M2 达成**:`moon-templ` 现在能写这样一个真实页面并输出正确 HTML。
-- [ ] **T3.11** 移植 templ 条件/循环/调用 golden — `test-if` / `test-for` / `test-call` 目录转为 MoonBit 快照测试 · 前置 T3.6 · M
+- [x] **T3.11** 移植 templ 条件/循环/调用 golden — `test-if` / `test-for` / `test-call` 目录转为 MoonBit 快照测试 · 前置 T3.6 · M
+  - 落点 `golden/if`、`golden/for`、`golden/call`,**一个 templ 目录一个包**:templ 那三个目录各自是独立的 Go package,而 MoonBit 没有重载 —— `test-if` 与 `test-for` 的模板都叫 `render`,挤在一个包里根本编不过,分包是唯一能保留原名的写法。每个包 = `<名>.templ` + 产物 + `moon.pkg` + `_wbtest.mbt` 断言。
+  - **断言值逐个对着 `expected.html` 核过**:三个 golden 文件去掉换行后**与断言逐字节相同**(`tr -d '\n'` 实测:`True` / `<div>a</div><div>b</div><div>c</div>` / `<div>A</div><div>B</div><div>C</div><div>Legacy call style</div><div>e</div><div id="wrapper"><div>Child content</div></div>`)。**`expected.html` 里的换行是 templ 的 htmldiff 给块级元素排版用的,不是产物**,所以断言里标签之间没有空白 —— 这点用 Go 探针独立验过:`if` 体产出的字面量是 `§§`(分支前后无空白),`for` 体是 `<div>§</div>`(**一整段**,说明相邻两次迭代之间无空白),`showAll` 体只剩 `<div>Child content</div>`(调用本身不写字面量)。
+  - **移植时的三处必然改写**(都是语言差异,不是行为差异):`data` → `Data`(MoonBit 类型名必须大写);`showAll` / `showOne` / `wrapChildren` → `show_all` / `show_one` / `wrap_children`(**T2.18** 的规则:模板名会变成 `fn` 名,不能大写开头);`for _, item := range items` → `for item in items`(T3.5 的两种形式之一)。模板体本身一字未改:`{ "True" }` / `{ "False" }` / `@child` / `@component` / `{ children... }` / `@b(c("C"))` / `@show_one(e())` 都是原样可用。
+  - `test-if` 的 golden **只覆盖了 `if` 的一半** —— `data.IsTrue()` 写死返回 `true`,`else` 分支从没被渲染过。移植时把 `Data` 存成 `value : Bool`(配 `Data::new`),两个分支各断言一次,补上 templ 没测的那一半。
+  - **防漂移守卫扩到 golden**:`cli/example_wbtest.mbt` 改名 `cli/checked_in_wbtest.mbt`(`git mv`),清单从"examples 四个"扩成 "examples + golden 共七个",walk 的根也从 `examples` 变成 `["examples","golden"]`(仓库根**故意不 walk**:底下有 `_build` 与依赖目录,那里出现的 `.templ` 不是我们的)。
+  - 踩到的坑:`Data` 只在**测试文件**里构造,`moon check`(不带测试编译)于是报 `struct_never_constructed` —— 结构体在被测代码里没有构造点。加 `Data::new` 后消失。**这条对任何"只在测试里 new 的类型"都成立**。
+  - 实测证据:`moon check` 零警告;`moon test` **319 passed / 0 failed**(较 T3.10 的 316 多出 3 个 golden 测试);三个 golden 包的产物在 `generate golden/...` 下报 `is up to date`。
 
 ---
 

@@ -1,0 +1,5 @@
+import {
+  "daqing/moon-templ/runtime" @rt,
+}
+
+formatter(ignore: [ "for_templ.mbt" ])
