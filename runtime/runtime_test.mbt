@@ -19,6 +19,20 @@ test "escape leaves ordinary text untouched" {
 }
 
 ///|
+test "escape does not detect existing entities" {
+  assert_eq(@runtime.escape("&amp;"), "&amp;amp;")
+}
+
+///|
+test "escape handles long input" {
+  let buf = StringBuilder()
+  for i = 0; i < 1000; i = i + 1 {
+    buf.write_string("a<b&c")
+  }
+  assert_eq(@runtime.escape(buf.to_string()).length(), 12000)
+}
+
+///|
 test "component renders to string through Show" {
   let c = @runtime.component(fn(_ctx, w) { w.write_string("<b>hi</b>") })
   assert_eq(c.to_string(), "<b>hi</b>")
