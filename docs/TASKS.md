@@ -4,7 +4,7 @@
 拆分日期:2026-10-17
 目标:把 `a-h/templ` 的模板引擎在 MoonBit 中重新实现
 
-**进度:37 / 58**
+**进度:38 / 58**
 
 ---
 
@@ -18,7 +18,7 @@
   | T0 决策与准备 | 5 | 5 | 0 |
   | T1 runtime 地基 | 5 | 5 | 0 |
   | T2 parser + generator 骨架 | 19 | 19 | 0 |
-  | T3 MVP 完整 | 11 | 8 | 0 |
+  | T3 MVP 完整 | 11 | 9 | 0 |
   | T4 属性特殊语义 | 8 | 0 | 0 |
   | T5 工具链与打磨 | 5 | 0 | 1(T5.2) |
   | T6 可选 / 远期 | 5 | 0 | 3 |
@@ -137,7 +137,14 @@
 - [x] **T3.6** 控制流分支:`match`(T0.1 已定,不用 Go 风格 `switch`)— 快照测试;需支持解构模式 `Some(x) => { ... }` · 前置 T3.5 · M
 - [x] **T3.7** `{ attrs... }` spread — 生成 `@rt.render_attributes` 调用 · 前置 T3.1 · M
 - [x] **T3.8** `{{ code }}` 原样写入函数体 — 单测:`{{ let x = 1 }}` 在产物中按 `let` 出现 · 前置 T2.15 · S
-- [ ] **T3.9** 目录扫描 + 批量生成(`generate ./...`)— 一条命令生成整目录;跳过无变化文件(等价 templ `-lazy`)· 前置 T2.14 · M
+- [x] **T3.9** 目录扫描 + 批量生成(`generate ./...`)— 一条命令生成整目录;跳过无变化文件(等价 templ `-lazy`)· 前置 T2.14 · M
+  - 参数形态:`generate <file.templ>`(老行为)/ `generate <dir>/...` / `generate <dir>`(裸目录等价于 `<dir>/...`)。`...` 单独出现即当前目录。判据是**参数形态**而不是"路径恰好是目录":写了 `./...` 却不存在时,报的是 `cannot read <dir>`(目录语境),不会退化成"读文件失败"这种看不出问题的提示。
+  - **无变化即不落盘**:目标已存在、且内容与本次生成**逐字节相同**时返回 `Unchanged`,不写文件 —— 避免 mtime 变化让下游构建白跑一遍,正是 templ `-lazy` 的目的。**偏差**:templ 比的是 mtime(`goFileIsUpToDate`:`goFile mtime.After(templ mtime)`),我们比的是内容。理由:mtime 会被 `touch`、`git clone`、跨机器时钟差骗到,内容才是真正决定"构建有没有活干"的东西;代价是省不掉解析与生成的开销(实测 mtime 在跳过时确实不变)。
+  - `generate_file` 返回值由 `String` 改为 `enum Generated { Written(path~) | Unchanged(path~) }` —— 单文件路径也要能分辨这次到底写没写。
+  - **批处理不因单个文件出错而中止**:每个失败打到 stderr 并继续走完剩下的文件,最后整体退 1。理由:一整棵树里坏一个模板就看不到其余诊断,是批处理最烦人的地方;`moon build` 也是这么做的。
+  - **空目录报错退 1**(`no .templ files under <dir>`),不静默成功 —— 路径打错时静默成功是最坏的结果。目录不存在则更早地报 `cannot read <dir>`。
+  - **踩到的坑:`Array[String]::sort` 不是字典序!** MoonBit 的 `impl Compare for String` **先比长度再比内容**(`builtin/string.mbt:333`),所以 `["a_templ.mbt", "a.templ", "nested"].sort()` 得到 `nested, a.templ, a_templ.mbt`。实测确认后改用 `sort_by(fn(a, b) { a[:].lexical_compare(b[:]) })`,遍历顺序才和 `ls` 一致且跨机器稳定。**这条对任何"给字符串数组排序"的地方都成立**,值得记住。
+  - 单测只覆盖不写盘的部分(`is_tree_argument` / `tree_root` / `templ_files_under` 走真实目录 / `run` 的拒绝分支),沿用 T2.14 的判据:往仓库里写临时文件会留垃圾。写盘与跳过路径**手工实测**(临时树放在 `_scratch/`,移走后无残留):新文件 `generated`、第二次 `is up to date` 且 mtime 不变;批处理里坏模板报错而其余文件照常生成、退 1;手写同名文件被防覆盖挡下且未被改动;`generate ./...` 在仓库根跑完整棵树,`examples/hello/hello_templ.mbt` 报 `is up to date` 且 mtime 不变。
 - [ ] **T3.10** **端到端 M2**:写一个真实页面 — 布局组件 + 循环 + 条件 + children + 跨包组件调用,输出正确 · 前置 T3.3、T3.5、T3.6 · M
 - [ ] **T3.11** 移植 templ 条件/循环/调用 golden — `test-if` / `test-for` / `test-call` 目录转为 MoonBit 快照测试 · 前置 T3.6 · M
 
