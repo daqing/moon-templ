@@ -41,9 +41,7 @@ pub fn RangeWriter::in_literal(self : RangeWriter) -> Bool {
 ///
 /// The level belongs to the literal rather than to whatever flushes it: the run
 /// that ends a body is flushed by the closing brace a level further out, and
-/// should still be indented where it was written. A run takes the outermost
-/// level it spans, so one that opens an element and runs on through its closing
-/// tag lines up with the tag rather than with the children inside it.
+/// should still be indented where it was written.
 pub fn RangeWriter::write_literal(
   self : RangeWriter,
   level : Int32,
@@ -51,8 +49,6 @@ pub fn RangeWriter::write_literal(
 ) -> Unit {
   if !self.in_literal {
     self.in_literal = true
-    self.literal_level = level
-  } else if level < self.literal_level {
     self.literal_level = level
   }
   self.buf.write_string(s)

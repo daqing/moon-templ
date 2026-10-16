@@ -1,0 +1,17 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "daqing/moon-templ/examples/hello"
+
+import {
+  "daqing/moon-templ/runtime",
+}
+
+// Values
+pub fn hello(String) -> @runtime.Component
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

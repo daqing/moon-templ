@@ -1,0 +1,5 @@
+import {
+  "daqing/moon-templ/runtime" @rt,
+}
+
+pkgtype(kind: "executable")

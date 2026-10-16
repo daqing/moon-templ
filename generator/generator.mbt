@@ -159,6 +159,11 @@ fn Generator::write_expression(
 ///|
 /// A start tag, the children, and an end tag, all through the literal buffer so
 /// a run of them collapses into one `w.write_string` call.
+///
+/// Children stay at `level`: markup nests, but it produces one statement where
+/// it stands, and only blocks — a template body, and later an `if` or a `for` —
+/// move the indentation on. Indenting by element depth would fight `moon fmt`,
+/// which lines every statement of a block up at the block's own level.
 fn Generator::write_element(
   self : Generator,
   element : @parser.Element,
@@ -170,7 +175,7 @@ fn Generator::write_element(
   if @parser.is_void_element(element.name) && element.children.is_empty() {
     return
   }
-  self.write_nodes(element.children, level + 1)
+  self.write_nodes(element.children, level)
   self.w.write_literal(level, "</" + element.name + ">")
 }
 
