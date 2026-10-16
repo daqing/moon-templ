@@ -1,0 +1,51 @@
+templ multiline_class_attribute() {
+  <div
+    class="
+      flex w-full h-full
+      justify-center items-center
+      hover:bg-blue-50
+    "
+  >Multiline class attribute</div>
+}
+
+templ extra_spaces() {
+  <div class="a    b    c">Extra spaces between classes</div>
+}
+
+templ leading_trailing_spaces() {
+  <div class="   a b c   ">Leading and trailing spaces</div>
+}
+
+templ tabs_and_newlines() {
+  <div
+    class="a
+	b
+
+	c"
+  >Tabs and newlines</div>
+}
+
+templ case_insensitive() {
+  <div CLASS="a  b  c">Uppercase CLASS attribute</div>
+}
+
+templ other_attributes_unchanged() {
+  <div data-class="a  b  c">Non-class attributes unchanged</div>
+}
+
+templ expression_class_list(on : Bool) {
+  <div class={ @rt.CSSClasses::new([@rt.Name("always"), @rt.Toggle(@rt.kv("sometimes", on))]) }>Expression class list</div>
+}
+
+templ expression_string_is_one_name() {
+  <div class={ "a  b" }>An expression class list is not a constant</div>
+}
+
+templ test_component() {
+  @multiline_class_attribute()
+  @extra_spaces()
+  @leading_trailing_spaces()
+  @tabs_and_newlines()
+  @case_insensitive()
+  @other_attributes_unchanged()
+}

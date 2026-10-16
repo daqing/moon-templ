@@ -191,6 +191,52 @@ test "an attribute value holding a quote picks the other quote" {
 }
 
 ///|
+/// A class list is a list of names, and the whitespace between them is only
+/// there to separate them: a list wrapped over several lines says the same thing
+/// as one written on a single line, so both render alike.
+test "a class attribute's whitespace is collapsed" {
+  assert_eq(
+    rendered_html("templ t() {\n  <div class=\"a    b\">hi</div>\n}\n"),
+    "<div class=\"a b\">hi</div>",
+  )
+  assert_eq(
+    rendered_html("templ t() {\n  <div class=\"  a\tb  \n c \">hi</div>\n}\n"),
+    "<div class=\"a b c\">hi</div>",
+  )
+  assert_eq(
+    rendered_html("templ t() {\n  <div class=\"  \">hi</div>\n}\n"),
+    "<div class=\"\">hi</div>",
+  )
+}
+
+///|
+/// The whitespace Go calls space is not only the space, tab and newline a
+/// template usually holds: a no-break space separates two names too, which is
+/// what `strings.Fields` does and so what the ported output does.
+test "a class list is split on every character Go calls a space" {
+  assert_eq(
+    rendered_html(
+      "templ t() {\n  <div class=\"a\u{00a0}b\u{0085}c\">hi</div>\n}\n",
+    ),
+    "<div class=\"a b c\">hi</div>",
+  )
+}
+
+///|
+/// templ matches the name with `strings.EqualFold`, so an upper case `CLASS` is
+/// a class list as well — and the name is still written out as it was read.
+test "a class list is recognised whatever the case of its name" {
+  assert_eq(
+    rendered_html("templ t() {\n  <div CLASS=\"a  b\">hi</div>\n}\n"),
+    "<div CLASS=\"a b\">hi</div>",
+  )
+  assert_eq(
+    rendered_html("templ t() {\n  <div data-class=\"a  b\">hi</div>\n}\n"),
+    "<div data-class=\"a  b\">hi</div>",
+  )
+}
+
+///|
 /// An expression attribute is the one value the generator cannot put in the
 /// literal buffer, because resolving it is what escapes it: the quotes it sits
 /// between are literals, and the value goes out through a call of its own.

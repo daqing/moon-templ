@@ -1,0 +1,33 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "daqing/moon-templ/golden/class"
+
+import {
+  "daqing/moon-templ/runtime",
+}
+
+// Values
+pub fn case_insensitive() -> @runtime.Component
+
+pub fn expression_class_list(Bool) -> @runtime.Component
+
+pub fn expression_string_is_one_name() -> @runtime.Component
+
+pub fn extra_spaces() -> @runtime.Component
+
+pub fn leading_trailing_spaces() -> @runtime.Component
+
+pub fn multiline_class_attribute() -> @runtime.Component
+
+pub fn other_attributes_unchanged() -> @runtime.Component
+
+pub fn tabs_and_newlines() -> @runtime.Component
+
+pub fn test_component() -> @runtime.Component
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

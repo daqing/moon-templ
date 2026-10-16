@@ -752,6 +752,11 @@ fn Generator::write_attribute(
 ) -> Unit raise GenerateError {
   match attr {
     Constant(name~, value~) => {
+      let value = if is_class_attribute(name) {
+        collapse_class_whitespace(value)
+      } else {
+        value
+      }
       let quote = if value.contains("\"") { "'" } else { "\"" }
       self.w.write_literal(level, " " + name + "=" + quote + value + quote)
     }
@@ -821,6 +826,53 @@ fn Generator::write_expression_attribute(
     "w.write_string(@rt.resolve_attribute_value(" + expr + "))\n",
   )
   self.w.write_literal(level, "\"")
+}
+
+///|
+/// Whether an attribute holds a class list. templ matches the name with
+/// `strings.EqualFold`, so `CLASS="a  b"` is a class list too.
+fn is_class_attribute(name : String) -> Bool {
+  name.to_lower() == "class"
+}
+
+///|
+/// The whitespace a class list was written with, collapsed: a list wrapped over
+/// several lines is the same list as one written on a single line, and templ
+/// makes them render alike.
+///
+/// This is `strings.Fields` joined by a space, which splits on every character Go
+/// calls space — not just the space, tab and newline a template usually holds.
+fn collapse_class_whitespace(value : String) -> String {
+  let buf = StringBuilder()
+  let mut started = false
+  let mut pending = false
+  for c in value {
+    if is_class_space(c) {
+      // Whitespace at either end has nothing to separate, so it is dropped
+      // rather than turned into a space.
+      pending = started
+    } else {
+      if pending {
+        buf.write_char(' ')
+        pending = false
+      }
+      buf.write_char(c)
+      started = true
+    }
+  }
+  buf.to_string()
+}
+
+///|
+fn is_class_space(c : Char) -> Bool {
+  c == ' ' ||
+  c == '\t' ||
+  c == '\n' ||
+  c == '\r' ||
+  c == '\u{0b}' ||
+  c == '\u{0c}' ||
+  c == '\u{85}' ||
+  c == '\u{a0}'
 }
 
 ///|

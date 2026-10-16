@@ -4,7 +4,7 @@
 拆分日期:2026-10-17
 目标:把 `a-h/templ` 的模板引擎在 MoonBit 中重新实现
 
-**进度:42 / 58**
+**进度:43 / 58**
 
 ---
 
@@ -19,7 +19,7 @@
   | T1 runtime 地基 | 5 | 5 | 0 |
   | T2 parser + generator 骨架 | 19 | 19 | 0 |
   | T3 MVP 完整 | 11 | 11 | 0 |
-  | T4 属性特殊语义 | 8 | 2 | 0 |
+  | T4 属性特殊语义 | 8 | 3 | 0 |
   | T5 工具链与打磨 | 5 | 0 | 1(T5.2) |
   | T6 可选 / 远期 | 5 | 0 | 3 |
 
@@ -187,7 +187,14 @@
   - **不排序**:这里与 T4.1 的 map 相反,templ 是按写入顺序输出的,单测 `["zz", "aaa"]` → `"zz aaa"` 钉住这条(避免顺手套用 T4.1 的排序)。
   - 单测 7 条:常量与开关混合、后写的开关关掉前面的名字、后写的名字把开关重新打开、重复名字只出一次、保序、空表与全关、名字不转义(对齐 templ 的 `"a </style>"` → `"a </style>"`)。
   - `moon check` 零警告;`moon test` **334 passed / 0 failed**(较 T4.1 的 327 多出 7 个)。
-- [ ] **T4.3** `class` 属性特殊处理 — 表达式走 `CSSClasses`,常量值 join 消空白;对 templ golden 校验 · 前置 T4.2、T3.1 · M
+- [x] **T4.3** `class` 属性特殊处理 — 表达式走 `CSSClasses`,常量值 join 消空白;对 templ golden 校验 · 前置 T4.2、T3.1 · M
+  - templ 的规则就读它那三行(`generator/generator.go:1234`):`if k, ok := attr.Key.(parser.ConstantAttributeKey); ok && strings.EqualFold(k.Name, "class") { attrValue = strings.Join(strings.Fields(attrValue), " ") }`。**只对常量属性**、名字用 `EqualFold` 比对。照搬成 `is_class_attribute`(`name.to_lower() == "class"`)与 `collapse_class_whitespace`(等价 `strings.Join(strings.Fields(v), " ")`),加在 `Generator::write_attribute` 的 `Constant` 分支上。
+  - `strings.Fields` 按 Go 的 `unicode.IsSpace` 切,不只是空格/Tab/换行:单测里 `a\u{00a0}b\u{0085}c`(不换行空格 + NEL)→ `a b c`,把这条钉住。
+  - **名字的大小写原样输出**:`<div CLASS="a  b  c">` 生成 `<div CLASS="a b c">`。templ 自己生成的 Go 也是 `CLASS`(见 `test-class-whitespace/template_templ.go` 第 6 行),那边 `expected.html` 写 `class` 是 htmldiff 解析 HTML 时把属性名规范化了,不是 templ 的输出。wbtest 的注释里说明这点,免得后人以为我们多了个大小写偏差。
+  - **表达式一侧生成器一行都不用改**:templ 之所以包一层 `templ.CSSClasses(expr).String()`,是因为它要在 `any` 上做运行期分派;这里没有 `any`,调用方直接写 `@rt.CSSClasses::new([...])`,表达式属性照原路走 `@rt.resolve_attribute_value(...)` —— T4.2 的 `Show for CSSClasses` 给出列表、外层照常转义。所以"表达式走 CSSClasses"在生成器里是**零改动**,能成立是因为 T4.2 的 `impl Show` 就是那个 `String()`。
+  - 顺带钉住一条容易误解的边界:`class={ "a  b" }`(裸字符串表达式)**不消空白** —— templ 里字符串整体算**一个**类名(`cp.AddClassName(c, true)`,不切),空格是它自己的。所以"消空白"是**常量值**的规则,不是"名字叫 class"的规则;有单测。
+  - golden:`golden/class/` 移植 templ 的 `generator/test-class-whitespace`(6 个模板 + `test_component`),模板名按 T2.18 转 snake_case。逐条对过:`templ@v0.3.1070/generator/test-class-whitespace/template_templ.go` 里那 6 行 `WriteString` 与我们的 `class_templ.mbt` 逐字相同。另加两个 gold 里没有的模板(`expression_class_list` / `expression_string_is_one_name`)补表达式那一侧 —— 原 golden 只有常量,不然这半条任务没有端到端覆盖。已在 `cli/checked_in_wbtest.mbt` 的 `checked_in_templates()` 登记(否则"树里每个模板都被检查过"那条会红)。
+  - `moon check` 零警告;`moon test` **340 passed / 0 failed**(较 T4.2 的 334 多出 6:生成器 3 + golden 3)。
 - [ ] **T4.4** `style` 属性 sanitize — 对 templ golden 校验 · 前置 T4.1 · M
 - [ ] **T4.5** URL 白名单:`a[href]` `link[href]` `form[action]` `object[data]` — **故意用 `javascript:` 输入,断言被拦截** · 前置 T4.1 · M
 - [ ] **T4.6** 事件属性 `on*` / `hx-on:*` → `ComponentScript` — 输出 `.Call` 而非转义值 · 前置 T4.1 · M
