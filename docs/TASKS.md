@@ -4,7 +4,7 @@
 拆分日期:2026-10-17
 目标:把 `a-h/templ` 的模板引擎在 MoonBit 中重新实现
 
-**进度:41 / 58**
+**进度:42 / 58**
 
 ---
 
@@ -19,7 +19,7 @@
   | T1 runtime 地基 | 5 | 5 | 0 |
   | T2 parser + generator 骨架 | 19 | 19 | 0 |
   | T3 MVP 完整 | 11 | 11 | 0 |
-  | T4 属性特殊语义 | 8 | 1 | 0 |
+  | T4 属性特殊语义 | 8 | 2 | 0 |
   | T5 工具链与打磨 | 5 | 0 | 1(T5.2) |
   | T6 可选 / 远期 | 5 | 0 | 3 |
 
@@ -180,7 +180,13 @@
   - 单测 8 条:map 顺序无关、ordered 保序、`false` 标志整条消失、条件属性、名字与值转义、空集、按名而非按长度排序。
   - 端到端实测:`<div class="box" { attrs... }>hi</div>` 走 CLI 生成 → `moon build`/`moon run` 打出 `<div class="box" hidden id="x&amp;y">hi</div>`(临时包已移走)。顺带把 T3.10 记的那个缺口补上:该条目里"页面故意不用 `{ attrs... }`"的原因(运行时没有实现)至此消失。
   - `moon check` 零警告(补了 `pub extend Attributes with Attributer::{items}` 消掉 `implicit_impl_as_method`);`moon test` **327 passed / 0 failed**(较 T3.11 的 319 多出 8 个 runtime 单测)。
-- [ ] **T4.2** runtime:`CSSClasses` / `KV` — 单测:常量与表达式混合、空值剔除 · 前置 T4.1 · M
+- [x] **T4.2** runtime:`CSSClasses` / `KV` — 单测:常量与表达式混合、空值剔除 · 前置 T4.1 · M
+  - `KV` / `kv` 已在 **T4.1** 落地(散列属性列表本身就要一对名值),这里只补 `CSSClasses`:一个 `priv items : Array[CSSClass]`,配 `CSSClass::new` 式的构造 `CSSClasses::new`,以及 `impl Show`(对齐 templ 的 `String()`,名字不转义 —— 转义属于它落进去的那个属性值,T4.3 那一步做)。
+  - `CSSClass` 是 `Name(String)` / `Toggle(KV[String, Bool])` 两个变体,与 `AttributeValue::Conditional(KV[String, Bool])` 同构。templ 在 `Classes(...)` 里收 `any`(字符串、`templ.KV`、`map[string]bool`、`[]string`、`ComponentCSSClass` 等)再按动态类型分派;没有 `any` 就没有运行期分派,能表达的写法直接就是这两个变体,map 形态由调用方自己展开。`ComponentCSSClass` 属于 T6.1,`unknownTypeClassName` 那条兜底(给不认识的类型渲染 `--templ-css-class-unknown-type`)在这里不可能触发,不实现。
+  - **`cssProcessor` 的两条规则逐字对齐**(读的是 templ 的 `runtime.go` 与它自己的 `TestClassesFunction`):**顺序取名字第一次出现的位次,开关取最后一次写下的值**。所以 `["a", KV("a", false)]` 一个都不输出,而 `[KV("a", false), "a"]` 输出 `a`;重复的名字只输出一次。templ 的用例 `["a", KV("b", true), "c", KV("c", false), KV("d", true), KV("e", false)]` → `"a b d"` 原样搬成一条单测。
+  - **不排序**:这里与 T4.1 的 map 相反,templ 是按写入顺序输出的,单测 `["zz", "aaa"]` → `"zz aaa"` 钉住这条(避免顺手套用 T4.1 的排序)。
+  - 单测 7 条:常量与开关混合、后写的开关关掉前面的名字、后写的名字把开关重新打开、重复名字只出一次、保序、空表与全关、名字不转义(对齐 templ 的 `"a </style>"` → `"a </style>"`)。
+  - `moon check` 零警告;`moon test` **334 passed / 0 failed**(较 T4.1 的 327 多出 7 个)。
 - [ ] **T4.3** `class` 属性特殊处理 — 表达式走 `CSSClasses`,常量值 join 消空白;对 templ golden 校验 · 前置 T4.2、T3.1 · M
 - [ ] **T4.4** `style` 属性 sanitize — 对 templ golden 校验 · 前置 T4.1 · M
 - [ ] **T4.5** URL 白名单:`a[href]` `link[href]` `form[action]` `object[data]` — **故意用 `javascript:` 输入,断言被拦截** · 前置 T4.1 · M

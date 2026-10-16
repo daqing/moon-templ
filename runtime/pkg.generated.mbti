@@ -35,6 +35,19 @@ pub fn Attributes::items(Self) -> Array[KV[String, AttributeValue]]
 pub fn Attributes::ordered(Array[KV[String, AttributeValue]]) -> Self
 pub impl Attributer for Attributes
 
+pub(all) enum CSSClass {
+  Name(String)
+  Toggle(KV[String, Bool])
+}
+
+pub(all) struct CSSClasses {
+  // private fields
+}
+pub fn CSSClasses::new(Array[CSSClass]) -> Self
+pub fn CSSClasses::output(Self, &Logger) -> Unit
+pub fn CSSClasses::to_string(Self) -> String
+pub impl Show for CSSClasses
+
 pub struct Component {
   // private fields
 }
