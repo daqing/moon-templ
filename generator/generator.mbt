@@ -69,28 +69,33 @@ fn Generator::write_template(
   template : @parser.Template,
 ) -> Unit raise GenerateError {
   self.template = template.name
-  // The body is dispatched before any of the skeleton is written, so a template
-  // that cannot be generated in full is refused rather than emitted in part.
-  self.write_nodes(template.nodes)
   self.w.write_indent(0, "\n///|\n")
   self.w.write_indent(
     0,
     "pub fn " + declaration(template) + " -> @rt.Component {\n",
   )
-  // An empty body touches neither closure parameter, so both are named as
-  // unused to keep the generated package warning-free.
-  self.w.write_indent(1, "@rt.component(fn(_ctx, _w) {  })\n")
+  if template.nodes.is_empty() {
+    // An empty body touches neither closure parameter, so both are named as
+    // unused to keep the generated package warning-free.
+    self.w.write_indent(1, "@rt.component(fn(_ctx, _w) {  })\n")
+  } else {
+    self.w.write_indent(1, "@rt.component(fn(_ctx, w) {\n")
+    self.write_nodes(template.nodes, 2)
+    self.w.write_indent(1, "})\n")
+  }
   self.w.write_indent(0, "}\n")
 }
 
 ///|
-/// Dispatch the nodes of a body to their handlers, in source order.
+/// Dispatch the nodes of a body to their handlers, in source order, at `level`
+/// two-space indents.
 fn Generator::write_nodes(
   self : Generator,
   nodes : Array[@parser.Node],
+  level : Int32,
 ) -> Unit raise GenerateError {
   for node in nodes {
-    self.write_node(node)
+    self.write_node(node, level)
   }
 }
 
@@ -104,15 +109,23 @@ fn Generator::write_nodes(
 fn Generator::write_node(
   self : Generator,
   node : @parser.Node,
+  level : Int32,
 ) -> Unit raise GenerateError {
-  let at = "in template `" + self.template + "`"
   match node {
-    DocType => refuse("a doc type", at)
-    HTMLComment(_) => refuse("an HTML comment", at)
-    Element(_) => refuse("an element", at)
-    Text(_) => refuse("a text", at)
-    StringExpression(_) => refuse("an expression", at)
+    DocType => self.w.write_literal(level, "<!doctype html>")
+    HTMLComment(contents) =>
+      self.w.write_literal(level, "<!--" + contents + "-->")
+    Text(text) => self.w.write_literal(level, text)
+    Element(_) => refuse("an element", self.location())
+    StringExpression(_) => refuse("an expression", self.location())
   }
+}
+
+///|
+/// Where the generator currently is, for diagnostics. The AST does not carry
+/// source positions yet; T5.1 adds them.
+fn Generator::location(self : Generator) -> String {
+  "in template `" + self.template + "`"
 }
 
 ///|

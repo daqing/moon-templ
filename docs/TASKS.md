@@ -4,7 +4,7 @@
 拆分日期:2026-10-17
 目标:把 `a-h/templ` 的模板引擎在 MoonBit 中重新实现
 
-**进度:20 / 55**
+**进度:21 / 55**
 
 ---
 
@@ -17,7 +17,7 @@
   |---|---|---|---|
   | T0 决策与准备 | 5 | 5 | 0 |
   | T1 runtime 地基 | 5 | 5 | 0 |
-  | T2 parser + generator 骨架 | 16 | 10 | 0 |
+  | T2 parser + generator 骨架 | 16 | 11 | 0 |
   | T3 MVP 完整 | 11 | 0 | 0 |
   | T4 属性特殊语义 | 8 | 0 | 0 |
   | T5 工具链与打磨 | 5 | 0 | 1(T5.2) |
@@ -71,7 +71,9 @@
   - 分派是 `match` 穷尽 `@parser.Node`,新增节点类型会**编译期**要求在此做出选择,不会静默漏掉;未实现的类型报 `cannot generate an element node yet (in template \`b\`)`。
   - 位置暂时只有模板名:AST 尚未携带源码位置(T5.1 补),节点下标要等有节点真正发射出来(T2.11)才有意义,届时一并加上。
   - 顺带修正 `RangeWriter::write_literal` 的缩进语义:层级随字面量走,而不是跟着触发 flush 的那行代码 —— 否则模板体末尾的那段字面量会被闭合花括号带到外一层缩进。
-- [ ] **T2.11** 字面量发射:把 `RangeWriter` 接进 generator — 单测:`<div>` + 文本 + `<span>` 合并成**一个** `write_string`,不是三次 · 前置 T2.7、T2.8、T2.9 · M
+- [x] **T2.11** 字面量发射:把 `RangeWriter` 接进 generator — 单测:`<div>` + 文本 + `<span>` 合并成**一个** `write_string`,不是三次 · 前置 T2.7、T2.8、T2.9 · M
+  - 文本、HTML 注释、doc type 三类节点都走 `RangeWriter`,相邻字面量自然并成一句 `w.write_string`;已实测生成物可编译并渲染出正确 HTML(`<!doctype html><!-- a page -->hi`)。
+  - 偏差:任务里写的是 `<div>`+文本+`<span>` 合并,但元素节点要等 **T2.12**;当前用 `Text` + `HTMLComment` + `Text` 三种相邻节点验证合并,元素版本挪到 T2.12 一起补。
 - [ ] **T2.12** 元素节点发射:起止标签、自闭合、void 元素 — 单测:`<div></div>` / `<br/>` / `<img src="x">` 三种产物都正确。**同时补 T2.3 留下的缺口:裸文本元素** `<>` `<text>` `<style>` `<script>`,其内容不按标签/表达式解析(T2.3 目前会把 `<style>a>b{}</style>` 误解析)· 前置 T2.3、T2.11 · M
 - [ ] **T2.13** 表达式节点发射:`{ expr }` → `@rt.write_any(w, expr)` — 单测:`Hello, { name }` 产物是**两段字面量夹一次** `write_any` · 前置 T2.2、T2.11、T1.3 · M
 - [ ] **T2.14** CLI 骨架:`moon-templ generate <file.templ>` 单文件 — 产出 `x_templ.mbt`。注意 `args[0]` 是构建产物路径,真实参数从 `args[1]` 起 · 前置 T2.13 · M
