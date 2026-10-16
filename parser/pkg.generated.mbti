@@ -16,6 +16,8 @@ pub fn parse_attributes(StringView, Int) -> (Array[Attribute], StringView, Bool)
 
 pub fn parse_nodes(StringView, Int, (StringView) -> Bool) -> (Array[Node], StringView) raise ParseError
 
+pub fn parse_template_file(String) -> TemplateFile raise ParseError
+
 pub fn scan_expression(StringView, Int) -> (String, StringView) raise ParseError
 
 // Errors
@@ -58,6 +60,7 @@ pub fn Node::to_repr(Self) -> @debug.Repr
 
 pub(all) struct Template {
   name : String
+  receiver : String
   params : String
   nodes : Array[Node]
 } derive(Eq, @debug.Debug)

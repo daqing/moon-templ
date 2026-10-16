@@ -4,7 +4,7 @@
 拆分日期:2026-10-17
 目标:把 `a-h/templ` 的模板引擎在 MoonBit 中重新实现
 
-**进度:15 / 55**
+**进度:16 / 55**
 
 ---
 
@@ -17,7 +17,7 @@
   |---|---|---|---|
   | T0 决策与准备 | 5 | 5 | 0 |
   | T1 runtime 地基 | 5 | 5 | 0 |
-  | T2 parser + generator 骨架 | 16 | 5 | 0 |
+  | T2 parser + generator 骨架 | 16 | 6 | 0 |
   | T3 MVP 完整 | 11 | 0 | 0 |
   | T4 属性特殊语义 | 8 | 0 | 0 |
   | T5 工具链与打磨 | 5 | 0 | 1(T5.2) |
@@ -63,7 +63,7 @@
 - [x] **T2.3** 文本节点 + 元素开闭标签解析(`parser/element.mbt`)— 单测:`<div></div>`、自闭合、void 元素、嵌套、大小写、元素名 charset、属性值内的 `>`;顺带把 `{ expr }` 收成 `StringExpression` 节点(否则文本循环会空转) · 前置 T2.2 · M
 - [x] **T2.4** 属性解析 v1:静态 `name="v"`、三种引号、裸布尔属性(`parser/attribute.mbt`)— 单测覆盖 `"` `'` 无引号三种形式、空值、名字 charset(`@click` `:class` `x-on:click`)。`name={ expr }` 与 `name?={ expr }` 显式报"暂不支持",留 T3.1 / T4.7 · 前置 T2.3 · M
 - [x] **T2.5** 空白归一化 v1(块级元素判定 + 折叠,`parser/whitespace.mbt`)— 规则从 templ 自己的 parser+generator 反推,并用 **748 组差分用例**对齐(`parser/whitespace_golden_test.mbt`,由 Go 探针生成)。规则与反例见 port-research §3.6 · 前置 T2.3 · M
-- [ ] **T2.6** 文件级切分:`templ` 块识别 + 签名抽取 — 单测:无参、带参、方法形式;签名用"扫描到 depth-0 `{`"取原文 · 前置 T2.1 · M
+- [x] **T2.6** 文件级切分:`templ` 块识别 + 签名抽取(`parser/template.mbt`)— 单测:无参、带参、方法形式;签名用"扫描到 depth-0 `{`"取原文。`Template` 增设 `receiver` 字段承接 `templ (self : T) Name()` 形式 · 前置 T2.1 · M
 - [ ] **T2.7** `RangeWriter` 两态写入(累积字面量 vs 写代码)— 单测:连续文本合并成**一个** `write_string`;字面量下标全文件递增 · 前置 T0.5 · M
 - [ ] **T2.8** 字面量生成:MoonBit 字符串转义 — 单测:含 `"` `\` 换行 tab 的文本。**`String::escape()` 自带首尾引号,别再包一层** · 前置 T2.7 · S
 - [ ] **T2.9** generator 骨架:`Generator` 结构 + 字面量下标/变量名两个计数器 + 组件函数头尾发射 — 对**空组件**产出可编译骨架,`moon check` 通过 · 前置 T2.6 · M

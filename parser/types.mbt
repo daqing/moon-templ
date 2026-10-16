@@ -25,9 +25,11 @@ pub(all) enum Attribute {
 ///|
 /// A `templ Name(params) { ... }` block. `params` keeps the source spelling of
 /// the parameter list, e.g. `name : String`, and is copied verbatim into the
-/// generated function header.
+/// generated function header. `receiver` holds the `templ (self : T) Name()`
+/// form the same way, and is empty for a plain function.
 pub(all) struct Template {
   name : String
+  receiver : String
   params : String
   nodes : Array[Node]
 } derive(Debug, Eq)

@@ -84,7 +84,7 @@ fn parse_nodes_into(
     }
     _ => {
       let buf = StringBuilder()
-      let rest = take_text(src, buf)
+      let rest = take_text(src, buf, stop)
       out.push(Text(buf.to_string()))
       parse_nodes_into(rest, offset + consumed(src, rest), stop, out)
     }
@@ -92,15 +92,24 @@ fn parse_nodes_into(
 }
 
 ///|
-/// Text runs until the next tag or expression; those are separate nodes.
-fn take_text(src : StringView, buf : StringBuilder) -> StringView {
+/// Text runs until the next tag or expression; those are separate nodes. It also
+/// stops where `stop` matches, which is how the `}` closing a template body ends
+/// the final text node.
+fn take_text(
+  src : StringView,
+  buf : StringBuilder,
+  stop : (StringView) -> Bool,
+) -> StringView {
+  if stop(src) {
+    return src
+  }
   match src {
     [] => src
     ['<', ..] => src
     ['{', ..] => src
     [c, .. rest] => {
       buf.write_char(c)
-      take_text(rest, buf)
+      take_text(rest, buf, stop)
     }
   }
 }

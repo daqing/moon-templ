@@ -8,6 +8,7 @@ test "ast values are constructible from outside the package" {
   }
   let t : @parser.Template = {
     name: "hello",
+    receiver: "",
     params: "name : String",
     nodes: [@parser.Element(el), @parser.DocType, @parser.HTMLComment("c")],
   }
