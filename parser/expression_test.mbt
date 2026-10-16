@@ -65,3 +65,32 @@ test "unterminated string literal is an error" {
     @parser.ParseError(offset=0, message="unterminated expression"),
   )
 }
+
+///|
+test "one value is not a comma at the top level" {
+  assert_false(@parser.holds_multiple_values("name"))
+  assert_false(@parser.holds_multiple_values("f(a, b)"))
+  assert_false(@parser.holds_multiple_values("[1, 2]"))
+  assert_false(@parser.holds_multiple_values("{ x: 1 }.x"))
+  assert_false(@parser.holds_multiple_values("\"a, b\""))
+  assert_false(@parser.holds_multiple_values("x == ','"))
+  assert_false(@parser.holds_multiple_values("f(\"a, b\", c)"))
+}
+
+///|
+test "a top-level comma means several values" {
+  assert_true(@parser.holds_multiple_values("a, b"))
+  assert_true(@parser.holds_multiple_values("a, "))
+  assert_true(@parser.holds_multiple_values("a, b, c"))
+}
+
+///|
+test "a comma inside a comment is not a value separator" {
+  assert_false(@parser.holds_multiple_values("/* a, b */ x"))
+  assert_false(@parser.holds_multiple_values("// a, b\nx"))
+}
+
+///|
+test "an unbalanced closer does not hide a top-level comma" {
+  assert_true(@parser.holds_multiple_values("a), b"))
+}

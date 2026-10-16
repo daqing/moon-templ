@@ -99,6 +99,18 @@ test "a run is indented where it started" {
 }
 
 ///|
+/// The run that opens an element and runs on through its closing tag is written
+/// at the element's level, not at the level of the children inside it.
+test "a run is indented at the outermost level it spans" {
+  let (out, _) = run(fn(w) {
+    w.write_literal(3, "text")
+    w.write_literal(2, "</div>")
+    w.write_literal(3, "tail")
+  })
+  assert_eq(out, "    w.write_string(\"text</div>tail\")\n")
+}
+
+///|
 test "in_literal reports whether a run is still open" {
   let out = StringBuilder()
   let w = @generator.RangeWriter::new(out)

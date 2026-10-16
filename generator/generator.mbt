@@ -104,8 +104,7 @@ fn Generator::write_nodes(
 ///
 /// The match covers every variant of `@parser.Node`, so a node type added to
 /// the AST has to be dealt with here instead of falling through and quietly
-/// leaving a hole in the output. A type whose handler has not landed yet is
-/// refused by name, rather than skipped.
+/// leaving a hole in the output.
 fn Generator::write_node(
   self : Generator,
   node : @parser.Node,
@@ -118,8 +117,36 @@ fn Generator::write_node(
     Element(element) => self.write_element(element, level)
     RawElement(raw) => self.write_raw_element(raw, level)
     Text(text) => self.w.write_literal(level, text)
-    StringExpression(_) => refuse("an expression", self.location())
+    StringExpression(expr) => self.write_expression(expr, level)
   }
+}
+
+///|
+/// An expression is code: it ends the literal run around it, so `Hello, { name }`
+/// is two `write_string` calls with the expression's own call between them.
+/// Escaping is the runtime's job, since only the value's type says how.
+///
+/// templ writes nothing at all for an expression that is empty or all
+/// whitespace, and so does this.
+fn Generator::write_expression(
+  self : Generator,
+  expr : String,
+  level : Int32,
+) -> Unit raise GenerateError {
+  let value = expr.trim().to_owned()
+  if value.is_empty() {
+    return
+  }
+  if @parser.holds_multiple_values(value) {
+    raise GenerateError(
+      message="`{ ... }` with more than one value is not supported yet: `{" +
+        value +
+        "}` (" +
+        self.location() +
+        ")",
+    )
+  }
+  self.w.write_indent(level, "@rt.write_any(w, " + value + ")\n")
 }
 
 ///|
@@ -188,13 +215,6 @@ fn Generator::write_attribute(
 /// source positions yet; T5.1 adds them.
 fn Generator::location(self : Generator) -> String {
   "in template `" + self.template + "`"
-}
-
-///|
-fn refuse(kind : String, at : String) -> Unit raise GenerateError {
-  raise GenerateError(
-    message="cannot generate " + kind + " node yet (" + at + ")",
-  )
 }
 
 ///|

@@ -26,6 +26,48 @@ fn dec(depth : Int32) -> Int32 {
 }
 
 ///|
+/// Whether the body of a `{ ... }` expression holds more than one value: a comma
+/// that is not inside brackets, a string, a rune or a comment. templ joins those
+/// values with `JoinStringErrs`; moon-templ does not support the form yet, and
+/// saying so beats generating a call with the wrong number of arguments.
+pub fn holds_multiple_values(expr : String) -> Bool {
+  at_top_level_comma(expr[:], 0)
+}
+
+///|
+fn at_top_level_comma(src : StringView, depth : Int32) -> Bool {
+  match src {
+    [] => false
+    [',', ..] if depth == 0 => true
+    ['{', .. rest] | ['(', .. rest] | ['[', .. rest] =>
+      at_top_level_comma(rest, depth + 1)
+    ['}', .. rest] | [')', .. rest] | [']', .. rest] =>
+      at_top_level_comma(rest, dec(depth))
+    ['"', .. rest] =>
+      match scan_string(rest, StringBuilder()) {
+        Some(r) => at_top_level_comma(r, depth)
+        None => false
+      }
+    ['\'', .. rest] =>
+      match scan_rune(rest, StringBuilder()) {
+        Some(r) => at_top_level_comma(r, depth)
+        None => false
+      }
+    ['/', '/', .. rest] =>
+      match scan_line_comment(rest, StringBuilder()) {
+        Some(r) => at_top_level_comma(r, depth)
+        None => false
+      }
+    ['/', '*', .. rest] =>
+      match scan_block_comment(rest, StringBuilder()) {
+        Some(r) => at_top_level_comma(r, depth)
+        None => false
+      }
+    [_, .. rest] => at_top_level_comma(rest, depth)
+  }
+}
+
+///|
 /// Returns `None` when the source ran out before the matching `}`.
 fn scan_expr(
   src : StringView,

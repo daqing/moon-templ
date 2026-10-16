@@ -6,6 +6,8 @@ import {
 }
 
 // Values
+pub fn holds_multiple_values(String) -> Bool
+
 pub fn is_block_element(String) -> Bool
 
 pub fn is_inline(Node) -> Bool

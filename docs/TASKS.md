@@ -4,7 +4,7 @@
 拆分日期:2026-10-17
 目标:把 `a-h/templ` 的模板引擎在 MoonBit 中重新实现
 
-**进度:22 / 56**
+**进度:23 / 56**
 
 ---
 
@@ -17,7 +17,7 @@
   |---|---|---|---|
   | T0 决策与准备 | 5 | 5 | 0 |
   | T1 runtime 地基 | 5 | 5 | 0 |
-  | T2 parser + generator 骨架 | 17 | 12 | 0 |
+  | T2 parser + generator 骨架 | 17 | 13 | 0 |
   | T3 MVP 完整 | 11 | 0 | 0 |
   | T4 属性特殊语义 | 8 | 0 | 0 |
   | T5 工具链与打磨 | 5 | 0 | 1(T5.2) |
@@ -80,10 +80,15 @@
   - **偏差一**:任务里写的 `<text>` 与 `<>` 在 templ v0.3.1070 中**并不存在** —— 源码那行的注释是过时的,实际注册的是 `parse.Any(styleElement, scriptElement)`。已把勘误记进 port-research §1.1,只实现 `<style>`/`<script>`。
   - **偏差二**:`<script>` 暂时按 `rawElementParser` 的朴素做法扫到 `</script>`;templ 对 `type` 是 JS 的 `<script>` 另有 JS 字符串/注释感知的扫描器(`parser/v2/scriptparser.go`,约 200 行),留到后续任务。
   - **偏差三**:`Attribute.Constant` 没有保留源码引号(T2.4 未记录),生成时统一用 `"`,仅当值里真的含 `"` 时退化成 `'`,以免生成出坏 HTML。
-- [ ] **T2.13** 表达式节点发射:`{ expr }` → `@rt.write_any(w, expr)` — 单测:`Hello, { name }` 产物是**两段字面量夹一次** `write_any` · 前置 T2.2、T2.11、T1.3 · M
+- [x] **T2.13** 表达式节点发射:`{ expr }` → `@rt.write_any(w, expr)` — 单测:`Hello, { name }` 产物是**两段字面量夹一次** `write_any` · 前置 T2.2、T2.11、T1.3 · M
+  - 表达式是代码,写出它即结束当前字面量连续段,所以 `Hello, { name }!` 是 `write_string` / `write_any` / `write_string` 三句:实测产物可编译、可渲染,`greet("<b>&\"x", 0)` → `&lt;b&gt;&amp;&#34;x`(转义由 T1.3 的运行时负责)。
+  - 表达式原文 **trim 后逐字抄进产物**,不做任何解析或改写 —— 语法正确性交给 MoonBit 编译器,出错位置也落在产物里那一行。
+  - **多值表达式 `{ a, b }` 暂不支持**(port-research §8 已定的 MVP 范围):templ 用变参的 `JoinStringErrs` 拼接,templ 侧要支持得先决定 MoonBit 侧的拼接语义。现在**明确报错**而不是生成一个参数个数不对的调用;判据是 parser 新增的 `holds_multiple_values`(只在顶层、括号/字符串/rune/注释之外数逗号),`{ f(a, b) }` 与 `{ "a, b" }` 仍算单值。
+  - `{ }`/`{   }` 与 templ 一致:**什么都不写**(templ 的 `writeStringExpression` 对空白表达式直接 return)。副作用是 `templ t() { { } }` 的产物里 `w` 未被使用,会触发 `unused_value`,归到 T2.16 一并定案。
+  - 顺带把 `RangeWriter` 的字面量层级改成"取该连续段跨越的**最外层**层级":否则一段从元素内部开始、一路吸收到该元素闭合标签的字面量,会按子节点的层级缩进,与上下文的标签对不齐(产物见 `_scratch` 实测)。
 - [ ] **T2.14** CLI 骨架:`moon-templ generate <file.templ>` 单文件 — 产出 `x_templ.mbt`。注意 `args[0]` 是构建产物路径,真实参数从 `args[1]` 起 · 前置 T2.13 · M
 - [ ] **T2.15** **端到端 M1**:手写 `examples/hello/hello.templ` 全链路跑通 — 生成 → `moon build` → 运行 → HTML 输出逐字节正确;写成可重复执行的集成测试 · 前置 T2.14 · S
-- [ ] **T2.16** 生成后内联 `@fmt.format` 规范化产物 — 产物格式规范、`///|` 块分隔齐全(port-research §6)· 前置 T2.15 · S
+- [ ] **T2.16** 生成后内联 `@fmt.format` 规范化产物 — 产物格式规范、`///|` 块分隔齐全(port-research §6)。**同时定案 `unused_value` 的产物侧对策**:未使用的模板参数、以及只写空表达式(`{ }`)导致 `w` 没被用到的模板,产物不能带警告 · 前置 T2.15 · S
 - [ ] **T2.17** 解析 `<!doctype html>` 与 `<!-- ... -->`(parser 侧)— T2.11 已经能**发射**这两类节点,但 parser 一个都产生不出来,现在只能从手搭 AST 测;不加这段,真实页面里的 doctype 会直接报"element name must start with a lowercase letter: !"。同时给 T2.11 的 `HTMLComment` 内容定案:templ 的 `Contents` **不含** `<!--`/`-->`,只有中间那段 · 前置 T2.4 · S
 
 ---
