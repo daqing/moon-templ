@@ -1,0 +1,23 @@
+templ render() {
+  <a href="javascript:alert('unaffected');">Ignored</a>
+  <a href={ @rt.url("javascript:alert('should be sanitized')") }>Sanitized</a>
+  <a href={ @rt.SafeURL::new("javascript:alert('should not be sanitized')") }>Unsanitized</a>
+}
+
+templ render_form() {
+  <form action="javascript:alert('unaffected');">Ignored</form>
+  <form action={ @rt.url("javascript:alert('should be sanitized')") }>Sanitized</form>
+  <form action={ @rt.SafeURL::new("javascript:alert('should not be sanitized')") }>Unsanitized</form>
+  <form action={ safe_url("javascript:alert('should not be sanitized')") }>with error unsanitized</form>
+  <form action={ string_url("javascript:alert('should be sanitized')") }>with error sanitized</form>
+}
+
+templ render_link_and_object() {
+  <link href={ @rt.url("javascript:alert('link')") }/>
+  <object data={ @rt.url("javascript:alert('object')") }></object>
+}
+
+templ render_other_attributes() {
+  <img src={ @rt.url("javascript:alert('src')") }/>
+  <a title={ "javascript:alert('title')" }>Other</a>
+}

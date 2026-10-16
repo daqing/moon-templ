@@ -4,7 +4,7 @@
 拆分日期:2026-10-17
 目标:把 `a-h/templ` 的模板引擎在 MoonBit 中重新实现
 
-**进度:44 / 58**
+**进度:45 / 58**
 
 ---
 
@@ -19,7 +19,7 @@
   | T1 runtime 地基 | 5 | 5 | 0 |
   | T2 parser + generator 骨架 | 19 | 19 | 0 |
   | T3 MVP 完整 | 11 | 11 | 0 |
-  | T4 属性特殊语义 | 8 | 4 | 0 |
+  | T4 属性特殊语义 | 8 | 5 | 0 |
   | T5 工具链与打磨 | 5 | 0 | 1(T5.2) |
   | T6 可选 / 远期 | 5 | 0 | 3 |
 
@@ -207,7 +207,17 @@
   - **差分校验**:把 158 个输入(整串、裸串、KV 六种、map 两种、`url(...)` 的各种引号与编码、危险值、边界)同时喂给真 templ(Go,`GOPROXY=off` 走本地模块缓存)与本实现,逐条比对 **158/158 一致**。唯一一次不符是 `url("https://example.com/a.png`(引号不配对),它把我们漏掉的两条检查逼了出来(`%` 转义、首段冒号)。临时语料测试跑完即移走,换成 19 条带注释的单测。
   - golden:`golden/style/` 移植 `generator/test-style-attribute`。那份 golden 只有**一个泛型模板** `Button[T any]`,被调用七次、每次一种值;本项目的解析器不支持泛型模板(`split_signature` 在模板名后要 `(`,`[` 直接报错),于是拆成三个模板(分别收 `String` / `@rt.Style` / `@rt.SafeCSS`),七种输入各断言一次。golden 的 `expected.html` 是给人看的写法(冒号后带空格、无分号)且走 HTML diff;真实产物已用 Go 探针逐字核对:两个按钮是 `background-color:blue;color:red;` 与 `background-color: red;`(函数返回那条留着空格、再补分号),按这个写进断言。已在 `cli/checked_in_wbtest.mbt` 登记。
   - `moon check` 零警告;`moon test` **362 passed / 0 failed**(较 T4.3 的 340 多出 22:运行时 19 + 生成器 2 + golden 1)。
-- [ ] **T4.5** URL 白名单:`a[href]` `link[href]` `form[action]` `object[data]` — **故意用 `javascript:` 输入,断言被拦截** · 前置 T4.1 · M
+- [x] **T4.5** URL 白名单:`a[href]` `link[href]` `form[action]` `object[data]` — **故意用 `javascript:` 输入,断言被拦截** · 前置 T4.1 · M
+  - 规则是 templ 的 `isExpressionAttributeValueURL(elementName, attrName)`(`generator.go:1852`),**元素名与属性名成对判断**:`a` / `link` 的 `href`、`form` 的 `action`、`object` 的 `data`,别处没有 —— 注意 **`src` 不在名单里**(`<img src={ u }/>` 走普通转义,已用真 templ 生成核对过)。生成器据此新增 `is_url_attribute(element, name)`,并把**元素名**一路传进 `write_attribute` / `write_expression_attribute`(此前只传属性名)。
+  - 两个名字都是**精确匹配**,templ 也是:属性名不折叠,所以 `<a HREF={ u }>` 走普通转义。这是 templ 的行为(它连大写元素名都解析不了 —— 实测 `<A>x</A>` 直接报 `close tag not found`,本项目解析器同样要求元素名以小写字母开头)。**这是 templ 的一个已知缺口**:浏览器把 `HREF` 读作 `href`,而它不过白名单;这里照搬不擅自加宽,仅在此记录。
+  - 白名单本身是 `templ.URL`(`url.go:12`):取第一个 `:` 之前的文本当 scheme,**只有当它里面没有 `/` 时**才算 scheme,然后 scheme 必须是 `http` / `https` / `mailto` / `tel` / `ftp` / `ftps` 之一(不分大小写),否则换成 `FailedSanitizationURL` = `about:invalid#TemplFailedSanitizationURL`。照搬为 `url()` + `is_safe_scheme()`。边界值得记两条:`?a=b:c` 与 `#a:b` 被读成 scheme `?a=b` / `#a:b` 而**挡掉**,`//javascript:alert(1)` 因为 `//javascript` 里有 `/` 而**放行**(与 templ 一致)。
+  - `JoinURLErrs[T ~string]` 里那次运行期类型断言(`any(s).(SafeURL)`)是这套东西的关键:值本来就是 `SafeURL` 就不再过滤。没有 `any`,改用 trait `AsURL`(`as_url(Self) -> SafeURL`),`String` 与 `SafeURL` 各实现一次 —— 与 T4.4 的 `Stylable` 同一个路子,而且调用方可以给自己的类型实现。代价是**静态分派**而非运行期判断,对这两个类型而言结果一致。
+  - **不需要错误通道**:`JoinURLErrs(expr)` 只 join 了一个空列表(`errors.Join()` 无参返回 nil),templ 生成的那段 error handler 是死代码 —— 白名单挡下来的 URL 照常渲染,只是变成 `about:invalid#…`。所以 `sanitize_url` 直接返回 `String`,生成器不加返回值。
+  - `SafeURL` 配了 `Show`(写出原样的 URL,对齐 templ 里 `SafeURL` 就是 string 类型、`string(u)` 可取),这样它在**非** URL 属性上(`title={ safe_url }`)也走 `resolve_attribute_value`,转义一次 —— 与 templ 的 `ResolveAttributeValue` 默认分支 `EscapeString(fmt.Sprint(v))` 一致。
+  - **差分校验**:41 个输入(六种 scheme 的大小写、`javascript:` / `data:` / `vbscript:` / `about:` / `file:` / `blob:` / `chrome:`、`a:b` / `:x` / `?a=b:c` / `#a:b` / `/a:b` / `a/b:c` / `//javascript:…`、带端口与查询串等)同时喂给真 templ 的 `templ.URL` 与本实现,逐条比对 **41/41 一致**。
+  - golden:`golden/url/` 移植 `generator/test-a-href` 与 `generator/test-form-action`(前者 3 个 `<a>`,后者 5 个 `<form>`,含两个"函数返回值"形态)。两个 Go 版的辅助函数返回 `(T, error)`,这里没有错误,于是 `safe_url` / `string_url` 只在返回类型上有别。另加两个 golden 没覆盖的:`link[href]` + `object[data]`,以及反例 `img[src]` + `a[title]`。
+  - golden 的断言是**逐字对齐真 templ 渲染结果**的:`a-href` 与 `form-action` 两段输出(含元素之间的空格 —— `<a>` 是 inline 所以留空格、`<form>` 是 block 所以不留)与真 templ 渲染逐字节相同;`link/object` 与 `img/title` 那两个模板在临时模块里用 `templ generate` 生成后渲染,同样逐字节相同。golden 的 `expected.html` 是给人看的写法,它对的是 HTML diff,不是字节。
+  - `moon check` 零警告;`moon test` **368 passed / 0 failed**(较 T4.4 的 362 多出 6:运行时 3 + 生成器 2 + golden 1)。
 - [ ] **T4.6** 事件属性 `on*` / `hx-on:*` → `ComponentScript` — 输出 `.Call` 而非转义值 · 前置 T4.1 · M
 - [ ] **T4.7** 布尔表达式属性 `name?={ expr }` — 假值时整个属性消失 · 前置 T3.1 · S
 - [ ] **T4.8** 条件属性 `if expr { attrs } else { attrs }` — 两个分支各有快照 · 前置 T3.4、T3.1 · M

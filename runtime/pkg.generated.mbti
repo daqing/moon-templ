@@ -6,6 +6,8 @@ pub fn component((RenderCtx, &Logger) -> Unit) -> Component
 
 pub fn escape(String) -> String
 
+pub fn failed_sanitization_url() -> SafeURL
+
 pub fn[K, V] kv(K, V) -> KV[K, V]
 
 pub fn raw(String) -> Component
@@ -15,6 +17,10 @@ pub fn[A : Attributer] render_attributes(&Logger, A) -> Unit
 pub fn[T : Show] resolve_attribute_value(T) -> String
 
 pub fn[A : Stylable] sanitize_style_attribute_value(A) -> String
+
+pub fn[A : AsURL] sanitize_url(A) -> String
+
+pub fn url(String) -> SafeURL
 
 pub fn[T : Show] write_any(&Logger, T) -> Unit
 
@@ -80,6 +86,16 @@ pub fn SafeCSS::new(String) -> Self
 pub fn SafeCSS::sanitized(Self) -> String
 pub impl Stylable for SafeCSS
 
+pub(all) struct SafeURL {
+  // private fields
+}
+pub fn SafeURL::as_url(Self) -> Self
+pub fn SafeURL::new(String) -> Self
+pub fn SafeURL::output(Self, &Logger) -> Unit
+pub fn SafeURL::to_string(Self) -> String
+pub impl AsURL for SafeURL
+pub impl Show for SafeURL
+
 pub(all) struct Style {
   // private fields
 }
@@ -101,6 +117,11 @@ pub(all) enum StylePart {
 // Type aliases
 
 // Traits
+pub(open) trait AsURL {
+  fn as_url(Self) -> SafeURL
+}
+pub impl AsURL for String
+
 pub(open) trait Attributer {
   fn items(Self) -> Array[KV[String, AttributeValue]]
 }

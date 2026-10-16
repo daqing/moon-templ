@@ -736,7 +736,7 @@ fn Generator::write_open_tag(
 ) -> Unit raise GenerateError {
   self.w.write_literal(level, "<" + name)
   for attr in attrs {
-    self.write_attribute(attr, level)
+    self.write_attribute(attr, name, level)
   }
   self.w.write_literal(level, ">")
 }
@@ -745,9 +745,13 @@ fn Generator::write_open_tag(
 /// Attributes are written as they were read, except for the quoting: the source
 /// quotes are not kept in the AST, so the generator picks the one that leaves the
 /// value intact.
+///
+/// The element the attributes belong to is passed along because one of the rules
+/// below is about the pair: an expression `href` is a URL only on an `<a>`.
 fn Generator::write_attribute(
   self : Generator,
   attr : @parser.Attribute,
+  element : String,
   level : Int32,
 ) -> Unit raise GenerateError {
   match attr {
@@ -761,7 +765,7 @@ fn Generator::write_attribute(
       self.w.write_literal(level, " " + name + "=" + quote + value + quote)
     }
     Expression(name~, value~) =>
-      self.write_expression_attribute(name, value, level)
+      self.write_expression_attribute(name, element, value, level)
     Spread(value~) => self.write_spread_attribute(value, level)
     Bool(name~) => self.w.write_literal(level, " " + name)
   }
@@ -796,6 +800,7 @@ fn Generator::write_spread_attribute(
 fn Generator::write_expression_attribute(
   self : Generator,
   name : String,
+  element : String,
   value : String,
   level : Int32,
 ) -> Unit raise GenerateError {
@@ -823,21 +828,49 @@ fn Generator::write_expression_attribute(
   self.w.write_literal(level, " " + name + "=\"")
   self.w.write_indent(
     level,
-    "w.write_string(@rt." + attribute_value_call(name) + "(" + expr + "))\n",
+    "w.write_string(@rt." +
+    attribute_value_call(name, element) +
+    "(" +
+    expr +
+    "))\n",
   )
   self.w.write_literal(level, "\"")
 }
 
 ///|
-/// The call an expression attribute's value goes through. Only `style` has one
-/// of its own: templ sanitizes the value of a style attribute, and picks between
-/// the sanitizer and the plain escape by the name of the attribute — matched
-/// exactly, so a `STYLE` attribute is escaped like any other.
-fn attribute_value_call(name : String) -> String {
-  if name == "style" {
+/// The call an expression attribute's value goes through, which is templ's
+/// `writeExpressionAttribute` choosing between its four writers. Two of them
+/// differ from the plain escape, and both are picked by name: a URL attribute
+/// goes through the whitelist, and a `style` attribute through the sanitizer.
+///
+/// templ's own order is URL first, then script, then `style`, then the default.
+/// The script writer is T4.6 and is missing here rather than forgotten.
+fn attribute_value_call(name : String, element : String) -> String {
+  if is_url_attribute(element, name) {
+    "sanitize_url"
+  } else if name == "style" {
     "sanitize_style_attribute_value"
   } else {
     "resolve_attribute_value"
+  }
+}
+
+///|
+/// Whether an attribute holds a URL that has to be followed rather than merely
+/// written: templ's `isExpressionAttributeValueURL`, which is a rule about the
+/// element and the attribute together.
+///
+/// Both names are matched exactly, as templ matches them, and an element name
+/// here is always lower case anyway — the parser rejects `<A>` the way templ's
+/// does. An attribute name is not folded, so `HREF={ u }` is escaped like any
+/// other attribute, which is templ's behavior; a browser reads `HREF` as `href`,
+/// so a template that spells it that way gets templ's hole and not ours.
+fn is_url_attribute(element : String, name : String) -> Bool {
+  match element {
+    "a" | "link" => name == "href"
+    "form" => name == "action"
+    "object" => name == "data"
+    _ => false
   }
 }
 
