@@ -1,0 +1,5 @@
+// import {
+//   "daqing/moon-templ" @lib,
+// }
+
+pkgtype(kind: "executable")
