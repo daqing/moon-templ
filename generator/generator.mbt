@@ -81,16 +81,186 @@ fn Generator::write_template(
     0,
     "pub fn " + declaration(template) + " -> @rt.Component {\n",
   )
-  if template.nodes.is_empty() {
-    // An empty body touches neither closure parameter, so both are named as
-    // unused to keep the generated package warning-free.
+  let unused = unused_params(template)
+  // A template that writes nothing never touches `w`, so the closure names it as
+  // unused instead of leaving a warning behind.
+  let writer = if emits_output(template.nodes) { "w" } else { "_w" }
+  if template.nodes.is_empty() && unused.is_empty() {
     self.w.write_indent(1, "@rt.component(fn(_ctx, _w) {  })\n")
   } else {
-    self.w.write_indent(1, "@rt.component(fn(_ctx, w) {\n")
+    self.w.write_indent(1, "@rt.component(fn(_ctx, " + writer + ") {\n")
+    for name in unused {
+      self.w.write_indent(2, "ignore(" + name + ")\n")
+    }
     self.write_nodes(template.nodes, 2)
     self.w.write_indent(1, "})\n")
   }
   self.w.write_indent(0, "}\n")
+}
+
+///|
+/// The parameters a template declares but its body never reads.
+///
+/// MoonBit warns about an unused parameter where Go does not, and a template's
+/// parameters are part of the signature its author asked for, so the body opens
+/// by ignoring the ones it does not use. An `ignore` of something that turns out
+/// to be used costs nothing, which is why an uncertain answer here is "used":
+/// the worst case is a warning, never a broken body.
+fn unused_params(template : @parser.Template) -> Array[String] {
+  // Declaration order, the receiver first, so the ignores read in the order the
+  // generated signature lists them.
+  let candidates : Array[String] = []
+  match plain_name(template.receiver) {
+    Some(name) => candidates.push(name)
+    None => ()
+  }
+  for name in param_names(template.params) {
+    candidates.push(name)
+  }
+  let out : Array[String] = []
+  for name in candidates {
+    if !mentions_in(template.nodes, name) {
+      out.push(name)
+    }
+  }
+  out
+}
+
+///|
+/// Whether a body writes anything at all. Only an empty expression writes
+/// nothing; a tag, a doctype, a comment or any text reaches the output, so this
+/// errs towards "it writes".
+fn emits_output(nodes : Array[@parser.Node]) -> Bool {
+  for node in nodes {
+    match node {
+      StringExpression(expr) => if !expr.trim().is_empty() { return true }
+      Text(text) => if !text.is_empty() { return true }
+      Element(_) | RawElement(_) | HTMLComment(_) | DocType => return true
+    }
+  }
+  false
+}
+
+///|
+/// The parameter names `params` declares, in order. Anything that is not a plain
+/// name — a labelled `~name`, an optional `?name` — is left out: the generator
+/// may not rewrite what the caller has to spell.
+fn param_names(params : String) -> Array[String] {
+  let out : Array[String] = []
+  for piece in split_top_level(params) {
+    match plain_name(piece) {
+      Some(name) => out.push(name)
+      None => ()
+    }
+  }
+  out
+}
+
+///|
+fn split_top_level(s : String) -> Array[String] {
+  let out : Array[String] = []
+  let buf = StringBuilder()
+  let mut depth = 0
+  for c in s {
+    match c {
+      '(' | '[' | '{' => {
+        depth = depth + 1
+        buf.write_char(c)
+      }
+      ')' | ']' | '}' => {
+        if depth > 0 {
+          depth = depth - 1
+        }
+        buf.write_char(c)
+      }
+      ',' =>
+        if depth == 0 {
+          out.push(buf.to_string())
+          buf.reset()
+        } else {
+          buf.write_char(c)
+        }
+      _ => buf.write_char(c)
+    }
+  }
+  out.push(buf.to_string())
+  out
+}
+
+///|
+/// The name a parameter declares, if it declares a plain one: everything before
+/// the first `:`, and only when that is an identifier. `None` means the generator
+/// will not touch it.
+fn plain_name(parameter : String) -> String? {
+  let buf = StringBuilder()
+  for c in parameter {
+    if c == ':' {
+      break
+    }
+    buf.write_char(c)
+  }
+  let name = buf.to_string().trim().to_owned()
+  if name.is_empty() {
+    return None
+  }
+  for c in name {
+    if !is_word_char(c) {
+      return None
+    }
+  }
+  Some(name)
+}
+
+///|
+fn is_word_char(c : Char) -> Bool {
+  (c >= 'a' && c <= 'z') ||
+  (c >= 'A' && c <= 'Z') ||
+  (c >= '0' && c <= '9') ||
+  c == '_'
+}
+
+///|
+/// Whether any expression in the body reads `name`. Text nodes are not searched:
+/// markup that happens to spell a parameter's name does not use it.
+fn mentions_in(nodes : Array[@parser.Node], name : String) -> Bool {
+  for node in nodes {
+    match node {
+      StringExpression(expr) =>
+        if mentions(expr[:], name[:], None) {
+          return true
+        }
+      Element(element) => if mentions_in(element.children, name) { return true }
+      RawElement(_) | Text(_) | HTMLComment(_) | DocType => ()
+    }
+  }
+  false
+}
+
+///|
+/// Whether `name` occurs in `src` as a whole identifier rather than as part of a
+/// longer one, so that a parameter `a` is not counted as read by `abc`.
+fn mentions(src : StringView, name : StringView, previous : Char?) -> Bool {
+  if src.has_prefix(name) {
+    let before = match previous {
+      Some(c) => !is_word_char(c)
+      None => true
+    }
+    let after = match src.get_view(start=name.length()) {
+      Some(rest) =>
+        match rest {
+          [c, ..] => !is_word_char(c)
+          [] => true
+        }
+      None => true
+    }
+    if before && after {
+      return true
+    }
+  }
+  match src {
+    [] => false
+    [c, .. rest] => mentions(rest, name, Some(c))
+  }
 }
 
 ///|

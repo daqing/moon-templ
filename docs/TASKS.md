@@ -4,7 +4,7 @@
 拆分日期:2026-10-17
 目标:把 `a-h/templ` 的模板引擎在 MoonBit 中重新实现
 
-**进度:25 / 56**
+**进度:26 / 57**
 
 ---
 
@@ -17,7 +17,7 @@
   |---|---|---|---|
   | T0 决策与准备 | 5 | 5 | 0 |
   | T1 runtime 地基 | 5 | 5 | 0 |
-  | T2 parser + generator 骨架 | 17 | 15 | 0 |
+  | T2 parser + generator 骨架 | 18 | 16 | 0 |
   | T3 MVP 完整 | 11 | 0 | 0 |
   | T4 属性特殊语义 | 8 | 0 | 0 |
   | T5 工具链与打磨 | 5 | 0 | 1(T5.2) |
@@ -99,8 +99,13 @@
   - **关键发现:`moon fmt` 会把一个块里的语句全部对齐到块自身的层级**,所以在产物里按元素深度缩进是白费功夫,格式化一次就被抹平(实测:格式化和未格式化的产物差的就是 `@rt.write_any` 那一行的缩进)。据此把 `write_element` 的子节点改回与父同级 —— **只有块**(模板体、以后的 `if`/`for`)才推层级,HTML 标签不推。T2.13 顺带加进 `RangeWriter` 的"取最外层层级"规则是在给更深的缩进打补丁,一并撤回。
   - 结果:生成的产物在 `moon fmt` 下**保持不变**(已用 `diff` 实测),这条比 T2.16 的 `@fmt.format` 内联更省事 —— T2.16 到那时只剩未使用变量的警告对策与 `///|` 分隔的复查。
   - 记录:`moon test` 的工作目录是**模块根**,不是包目录,所以测试里的路径写成 `examples/hello/hello.templ` 这种模块根相对路径。
-- [ ] **T2.16** 生成后内联 `@fmt.format` 规范化产物 — 产物格式规范、`///|` 块分隔齐全(port-research §6)。**同时定案 `unused_value` 的产物侧对策**:未使用的模板参数、以及只写空表达式(`{ }`)导致 `w` 没被用到的模板,产物不能带警告 · 前置 T2.15 · S
+- [x] **T2.16** 生成后内联 `@fmt.format` 规范化产物 — 产物格式规范、`///|` 块分隔齐全(port-research §6)。**同时定案 `unused_value` 的产物侧对策**:未使用的模板参数、以及只写空表达式(`{ }`)导致 `w` 没被用到的模板,产物不能带警告 · 前置 T2.15 · S
+  - **`@fmt.format` 内联:实测后决定不做,偏差已记入 port-research §6.1。** 证据:临时加上 `moonbitlang/parser@0.4.5` 后,`@fmt.format(generated.source)` 会把产物改成另一种版式(`@rt.component(` 的闭包参数独占一行并带尾逗号、文件开头的空行挪到注释之前),而 `moon fmt` 又把它**改回我们现在的版式**(把 `@fmt.format` 的产物落盘后跑 `moon fmt`,再与产物 `diff` —— 完全一致)。也就是说这条链上的 `@fmt.format` 比工具链里的 `moon fmt` 旧,内联它等于主动生成一个 `moon fmt` 立刻要重写的文件,还会当场把 T2.15 的漂移护栏弄红。另外 `moonbitlang/parser/fmt` 自己的 README 标着 "highly experimental and work in progress",注释与空行两项状态未打勾,依赖树也不小(x、lexer、moon_config、async、prettyprinter)。**采纳的判据是"产物是 `moon fmt` 的不动点"**,而不是"产物经过某个 formatter";这条已由 T2.15 的漂移护栏兜住:产物一旦被 `moon fmt` 改写,护栏立刻变红。`///|` 分隔由 `write_template` 自己发,`moon fmt` 保持不变。等 T3.x 出现 `if`/`for` 的真正嵌套块、靠构造维持不动点不再划算时再回来评估。
+  - **`unused_value` 定案**:未使用的参数与接收者在闭包体开头 `ignore(x)` —— 签名由模板作者决定,不能因为体里没读就删,`ignore` 保住调用点的具名写法;`ignore` 一个其实被用到的名字零代价,所以判不准时一律算"被用到",最坏是多一条警告而不会让体坏掉。`~name` 这类带标签(以及任何非平凡标识符)的参数**跳过不动**:调用点怎么拼是调用者的事,生成器不能替他改。体不产生任何输出时,写游标参数直接叫 `_w` 而不是 `w` + `ignore(w)`(空体的产物因此更短:一次 `@rt.component(fn(_ctx, _w) {  })`)。
+  - "体里有没有读这个参数"的判据是**只在 `StringExpression` 里搜**(元素递归下去),文本节点不算 —— `<p>name</p>` 里的 `name` 是给用户看的字,不是读参数。匹配按**整词**边界(`mentions`),否则参数 `a` 会被 `ab` 误判成已用。
+  - 结果:三个原先各带一条 `unused_value` 警告的模板全部无警告;generator 包 57 个测试、全模块 154 个测试通过。
 - [ ] **T2.17** 解析 `<!doctype html>` 与 `<!-- ... -->`(parser 侧)— T2.11 已经能**发射**这两类节点,但 parser 一个都产生不出来,现在只能从手搭 AST 测;不加这段,真实页面里的 doctype 会直接报"element name must start with a lowercase letter: !"。同时给 T2.11 的 `HTMLComment` 内容定案:templ 的 `Contents` **不含** `<!--`/`-->`,只有中间那段 · 前置 T2.4 · S
+- [ ] **T2.18** 大写模板名生成非法 MoonBit — 生成期明确报错,templ 侧允许 `templ Hello()` 而 MoonBit 的 `fn` 名必须小写写起。**实测证据**:`templ Hello()` 产出 `pub fn Hello() -> Unit` → `Parse error, unexpected token `(`, you may expect `::``;带接收者的 `templ (m : Model) Render()` 产出 `pub fn Model::Render(...)` → `Expected lower case identifier for name of `fn``。报错要指出是模板名的大小写问题并给出模板名与位置,不要让它变成用户看不懂的产物编译错误 · 前置 T2.15 · S
 
 ---
 

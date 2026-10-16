@@ -338,11 +338,19 @@ pub fn layout(title : String) -> @rt.Component {
 | `unused_value` | children 前导里的 `let children = ctx.children`,但模板没用到它 | 按上表分级发射(见 §3.2);别为了图省事无脑照抄前导 |
 | `implicit_impl_as_method` | runtime 里 `impl Show for Component` 的 `to_string`/`output` 被隐式提升,已废弃 | runtime 补 `pub extend Component with Show::{to_string, output}` |
 | `deprecated` | `StringBuilder::new()` | 用 `StringBuilder()` |
-| `unused_value` | **模板声明了但正文没用到的参数**(Go 只对局部变量报警,函数参数不报) | 待定,见下 |
+| `unused_value` | **模板声明了但正文没用到的参数**(Go 只对局部变量报警,函数参数不报) | 正文开头 `ignore(x)`,见下 |
+| `unused_value` | 正文不产生任何输出,写游标参数 `w` 没被用到 | 该参数直接命名 `_w` |
 
-最后一条是 T2.9 实测新发现的:`templ foo(x : Int) { <p>hi</p> }` 生成出来的 `pub fn foo(x : Int)` 会因为 `x` 未被使用而报警。Go 只在函数体内报未使用的局部变量,参数不管,所以 templ 没有这个问题,照搬会踩到。两条候选对策——正文开头发 `ignore(x)`,或把参数改名成 `_: Int`——前者保住具名调用(`foo(x=1)`)和签名可读性,倾向选它,**留到 T2.16 定案**(那时有 `@fmt.format` 和产物快照可以一起验证)。
+倒数第二条是 T2.9 实测新发现的:`templ foo(x : Int) { <p>hi</p> }` 生成出来的 `pub fn foo(x : Int)` 会因为 `x` 未被使用而报警。Go 只在函数体内报未使用的局部变量,参数不管,所以 templ 没有这个问题,照搬会踩到。候选对策有两条——正文开头发 `ignore(x)`,或把参数改名成 `_: Int`——**T2.16 定案选前者**:`ignore(x)` 保住具名调用(`foo(x=1)`)和签名可读性,而改名会把签名读成一堆 `_`,等于丢掉形参名字这个信息。定案时的两条补充判据:
 
-这条对 `moon-templ` 是个硬要求:**产物是给用户编译的,必须 warning-clean**。建议把"生成产物零警告"作为 CI 门禁。
+- **判不准就当成"用到了"。** `ignore` 一个其实被用到的名字零代价,漏 `ignore` 一个没被用到的名字才留警告 —— 所以出错方向要偏保守,最坏是多一条警告,不会让体坏掉。
+- **只对平凡标识符动手。** `~name` 这类带标签的参数、以及任何非标识符的形参一律跳过:调用点怎么拼是调用者的事,生成器不能替他改。
+
+"正文有没有读这个参数"只在 `StringExpression` 里搜(元素递归下去),文本节点不算——`<p>name</p>` 里的 `name` 是给用户看的字,不是读参数;匹配还要按整词边界,否则参数 `a` 会被 `ab` 误判成已用。
+
+最后一条是 T2.16 实测新发现的:`templ t() { { } }` 的正文一个输出都不产生,`w` 就没人碰。这里用 `_w` 而不是 `w` + `ignore(w)`,空体的产物因此能压成一行 `@rt.component(fn(_ctx, _w) {  })`。
+
+这两条对 `moon-templ` 是个硬要求:**产物是给用户编译的,必须 warning-clean**。建议把"生成产物零警告"作为 CI 门禁(T5.4)。
 
 ### 3.3 构建集成:两套机制(均已实测)
 
@@ -386,7 +394,7 @@ options(
 | 产物放在 package 目录外 | ❌ 被拒绝 |
 | `dev_build` 省略 `input` | ❌ 报 `data did not match any variant of untagged enum MoonPkgGenerate` |
 
-**`formatter(ignore: [...])` 是关键的配套项:** 把生成产物排除出 `moon fmt`,否则每次格式化都会重排生成文件,git diff 全是噪音。
+**`formatter(ignore: [...])` 是配套项:** 把生成产物排除出 `moon fmt`。不过按 §6.1 的结论,生成侧的产物本来就是 `moon fmt` 的不动点,`moon fmt` 不会改动它,所以这条从"必需"降为"用户可选的额外保险" —— 真正该守的是产物格式本身,而不是把产物藏起来。
 
 **⚠️ 唯一的 DX 痛点:** `input` 必须逐文件显式列出(不支持目录/glob,目录形式的行为不可靠)。每新增一个 `.templ` 都要改 `moon.pkg`。这是相对 templ 的实质性退步。
 
@@ -565,7 +573,22 @@ moon-templ/                      # 本仓库(monorepo,三个 module 或一个 mo
   }
   ```
   消耗完直接返回剩余 view,不需要手工递增 `pos`,也不用 `has_prefix` + 算偏移。templ 的每节点一个独立 parser + 有序分派表的结构可以原样保留。
-- **生成后调 `@fmt.format` 规范化。**(`moonbitlang/parser/fmt`)实测能把乱写的源码规范成标准格式并自动补 `///|` 块分隔,让产物读起来跟手写的一样。
+- **生成后调 `@fmt.format` 规范化。**(`moonbitlang/parser/fmt`)实测能把乱写的源码规范成标准格式并自动补 `///|` 块分隔,让产物读起来跟手写的一样。**但 T2.16 实测后决定不做,理由见 §6.1。**
+
+---
+
+### 6.1 产物格式化:T2.16 决定不内联 `@fmt.format`(实测)
+
+原计划是生成后调 `moonbitlang/parser/fmt` 的 `@fmt.format(src)` 把产物规范一遍(templ 生成后调 `gofmt` 的对应物)。**T2.16 实测后否决了这条路**,依据如下(全部可复现):
+
+1. 临时把 `moonbitlang/parser@0.4.5` 加进 `moon.mod`,`@fmt.format(产物)` 会把产物改成**另一种版式**:`@rt.component(` 的闭包参数独占一行并带尾逗号,文件开头多一个空行且挪到注释之前。
+2. 把这份格式化结果落盘后再跑 `moon fmt`,**`moon fmt` 又把它改回我们现在的版式**;与产物逐字节 `diff`,完全一致。
+3. 也就是说这条链上的 `@fmt.format` **比工具链里的 `moon fmt` 旧**,两版 formatter 对同一份源码的"标准格式"并不一致。内联它等于主动生成一个 `moon fmt` 立刻要重写的文件 —— 用户仓库里 `git diff` 全是噪音,而且会当场把 T2.15 的漂移护栏弄红(护栏比对的是逐字节相等)。
+4. 附带成本:`moonbitlang/parser/fmt` 的 README 自标 "highly experimental and work in progress"(注释格式、空行感知两项状态未打勾),依赖树也不小(x、lexer、moon_config、async、prettyprinter)。
+
+**采纳的判据因此换成"产物是 `moon fmt` 的不动点"**,而不是"产物经过某个 formatter"。这条不需要新依赖就能守:生成侧靠构造保证(见 §3.2.1 与 T2.15:元素嵌套不推语句层级,只有块才推),验证侧由 T2.15 的漂移护栏兜住 —— 产物一旦被 `moon fmt` 改写,护栏立刻变红。`///|` 块分隔由 `write_template` 自己发,实测 `moon fmt` 保持不变。
+
+等 T3.x 引入 `if`/`for` 这些真正的嵌套块、靠构造维持不动点不再划算时,再回来评估内联 formatter(届时要先确认所用版本与工具链的 `moon fmt` 一致)。
 
 ---
 
@@ -601,7 +624,7 @@ moon-templ/                      # 本仓库(monorepo,三个 module 或一个 mo
 | `moon fmt` 重排产物 | 每次格式化都改生成文件,git diff 变噪音 | 用 `formatter(ignore: [...])` 排除产物(实测有效) |
 | 空白归一化 | templ 最复杂、最易错的部分(块级元素判定、`SpaceVertical`→单空格降级) | 移植 templ 的 golden 测试目录作为基线 |
 | 表达式边界扫描 | `{ expr }` 要正确处理嵌套括号、字符串、注释、rune | 整体移植 `expressionparser.go`(约 200 行) |
-| 无 `gofmt` 等价物 | templ 生成后调 `gofmt` 保证产物合法格式 | ✅ 已解决:`moonbitlang/parser/fmt` 的 `@fmt.format(src)` 可**程序化调用**(实测能把乱写的源码规范成标准格式并自动补 `///|` 块分隔)。另外用 `formatter(ignore:)` 让 `moon fmt` 跳过产物 |
+| 无 `gofmt` 等价物 | templ 生成后调 `gofmt` 保证产物合法格式 | 已解决,但**不走 `@fmt.format`**:T2.16 实测 `moonbitlang/parser/fmt` 这版的版式与工具链 `moon fmt` 不一致(它格式化过的产物会被 `moon fmt` 再改回去),内联反而制造 diff 噪音。改为要求**产物是 `moon fmt` 的不动点**,由生成侧构造保证 + T2.15 的漂移护栏守(见 §6.1)。`formatter(ignore:)` 仍可作为用户侧的额外保险 |
 | 生态差异 | MoonBit 无 `net/http`,渲染目标不是 HTTP handler | 聚焦 `String` / `&Logger` 输出,Web 集成留给上层框架 |
 
 **未能确认的点:**

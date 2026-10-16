@@ -45,7 +45,10 @@ test "parameters are copied into the generated header" {
     "\n" +
     "///|\n" +
     "pub fn greet(name : String, times : Int) -> @rt.Component {\n" +
-    "  @rt.component(fn(_ctx, _w) {  })\n" +
+    "  @rt.component(fn(_ctx, _w) {\n" +
+    "    ignore(name)\n" +
+    "    ignore(times)\n" +
+    "  })\n" +
     "}\n",
   )
 }
@@ -58,7 +61,9 @@ test "a receiver turns the template into a method" {
     "\n" +
     "///|\n" +
     "pub fn Model::Greeting(self : Model) -> @rt.Component {\n" +
-    "  @rt.component(fn(_ctx, _w) {  })\n" +
+    "  @rt.component(fn(_ctx, _w) {\n" +
+    "    ignore(self)\n" +
+    "  })\n" +
     "}\n",
   )
 }
@@ -71,7 +76,10 @@ test "a method with parameters separates the receiver from them" {
     "\n" +
     "///|\n" +
     "pub fn Model::Greeting(m : Model, name : String) -> @rt.Component {\n" +
-    "  @rt.component(fn(_ctx, _w) {  })\n" +
+    "  @rt.component(fn(_ctx, _w) {\n" +
+    "    ignore(m)\n" +
+    "    ignore(name)\n" +
+    "  })\n" +
     "}\n",
   )
 }
@@ -338,6 +346,51 @@ test "an element's children do not indent the statements they produce" {
     "  })\n" +
     "}\n",
   )
+}
+
+///|
+/// A parameter the body reads is left alone; `ignore` is only for the ones it
+/// does not, since MoonBit warns about those where Go does not.
+test "only the parameters the body does not read are ignored" {
+  let source = generate_source(
+    "templ card(title : String, count : Int) {\n  <p>{ title }</p>\n}\n",
+  )
+  assert_true(source.contains("    ignore(count)\n"))
+  assert_false(source.contains("ignore(title)"))
+}
+
+///|
+/// `ab` is not a read of `a`, or every parameter would look used as soon as
+/// another one shared a prefix.
+test "a parameter is not read by a longer name that starts with it" {
+  let source = generate_source(
+    "templ t(ab : String, a : String) {\n  <p>{ ab }</p>\n}\n",
+  )
+  assert_true(source.contains("    ignore(a)\n"))
+  assert_false(source.contains("ignore(ab)"))
+}
+
+///|
+/// The parameter's name in markup is text, not a read of the parameter.
+test "text that spells a parameter's name does not count as reading it" {
+  let source = generate_source("templ t(name : String) {\n  <p>name</p>\n}\n")
+  assert_true(source.contains("    ignore(name)\n"))
+}
+
+///|
+/// A labelled parameter is part of how the caller spells the call, so the
+/// generator leaves the name alone even when the body does not read it.
+test "a labelled parameter is left unnamed" {
+  let source = generate_source("templ t(~name : String) {\n  <p>hi</p>\n}\n")
+  assert_false(source.contains("ignore"))
+}
+
+///|
+/// A body of nothing but empty expressions writes nothing, so there is nothing
+/// for the writer parameter to do.
+test "a body that writes nothing names the writer as unused" {
+  let source = generate_source("templ t() {\n  { }\n}\n")
+  assert_true(source.contains("@rt.component(fn(_ctx, _w) {\n"))
 }
 
 ///|
