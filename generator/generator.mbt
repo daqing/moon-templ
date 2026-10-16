@@ -76,6 +76,7 @@ fn Generator::write_template(
   template : @parser.Template,
 ) -> Unit raise GenerateError {
   self.template = template.name
+  self.check_name(template.name)
   self.w.write_indent(0, "\n///|\n")
   self.w.write_indent(
     0,
@@ -96,6 +97,35 @@ fn Generator::write_template(
     self.w.write_indent(1, "})\n")
   }
   self.w.write_indent(0, "}\n")
+}
+
+///|
+/// A template name becomes a MoonBit function name — a method name when the
+/// template has a receiver — and MoonBit requires those to start with a lowercase
+/// letter or an underscore. templ has no such rule, since Go is happy with
+/// `Hello()`, so a template brought over unchanged would otherwise come out as a
+/// generated file that does not parse, with the compiler complaining about the
+/// file the user never wrote.
+fn Generator::check_name(
+  self : Generator,
+  name : String,
+) -> Unit raise GenerateError {
+  match name.get_char(0) {
+    Some(c) => if is_fn_name_start(c) { return }
+    None => ()
+  }
+  raise GenerateError(
+    message="a template name must start with a lowercase letter or `_`, because it becomes a MoonBit function name, but this one is `" +
+      name +
+      "` (" +
+      self.location() +
+      ")",
+  )
+}
+
+///|
+fn is_fn_name_start(c : Char) -> Bool {
+  (c >= 'a' && c <= 'z') || c == '_'
 }
 
 ///|

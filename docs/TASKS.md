@@ -4,7 +4,7 @@
 拆分日期:2026-10-17
 目标:把 `a-h/templ` 的模板引擎在 MoonBit 中重新实现
 
-**进度:27 / 58**
+**进度:28 / 58**
 
 ---
 
@@ -17,7 +17,7 @@
   |---|---|---|---|
   | T0 决策与准备 | 5 | 5 | 0 |
   | T1 runtime 地基 | 5 | 5 | 0 |
-  | T2 parser + generator 骨架 | 19 | 17 | 0 |
+  | T2 parser + generator 骨架 | 19 | 18 | 0 |
   | T3 MVP 完整 | 11 | 0 | 0 |
   | T4 属性特殊语义 | 8 | 0 | 0 |
   | T5 工具链与打磨 | 5 | 0 | 1(T5.2) |
@@ -112,7 +112,13 @@
   - **偏差:`DocType` 从无载荷变体改成 `DocType(String)`**,携带关键字与 `>` 之间的那段值。templ 的 `DocType` 同样有 `Value` 字段。若保持无载荷,生成器只能硬写 `<!doctype html>`,`<!doctype svg>` / `<!doctype html PUBLIC ...>` 就会被**静默改写成 HTML5 的 doctype** —— 那是产出了错的内容,不是少了个功能。关键字仍然统一成小写(`<!DOCTYPE HTML>` → `<!doctype HTML>`,与 templ 的 `writeDocType` 一致),值原样保留。改动波及 `parser/pkg.generated.mbti` 与 3 处测试字面量。
   - 端到端实测:写一个带 `<!DOCTYPE html>` 与 `<!-- the greeting -->` 的真实页面走一遍 CLI,产物 HTML 逐字节正确(临时文件已移走)。
   - 遗留:这次顺带发现产物**不是** `moon fmt` 的不动点(超 80 列的 `write_string` 会被折行),已拆成 T2.19。
-- [ ] **T2.18** 大写模板名生成非法 MoonBit — 生成期明确报错,templ 侧允许 `templ Hello()` 而 MoonBit 的 `fn` 名必须小写写起。**实测证据**:`templ Hello()` 产出 `pub fn Hello() -> Unit` → `Parse error, unexpected token `(`, you may expect `::``;带接收者的 `templ (m : Model) Render()` 产出 `pub fn Model::Render(...)` → `Expected lower case identifier for name of `fn``。报错要指出是模板名的大小写问题并给出模板名与位置,不要让它变成用户看不懂的产物编译错误 · 前置 T2.15 · S
+- [ ] **T2.19** 把生成产物排除出 `moon fmt`,并更正 T2.16 记错的那条结论 — `moon fmt` **折行阈值实测为 80 列**(80 列不动、81 列折行,缩进 2 与 6 都一致),所以只要字面量或抄进来的表达式够长,产物就会被重排;T2.16 写的"产物是 `moon fmt` 的不动点"是**错的**,而抄进产物的表达式长度由用户决定,靠构造不可能补全这个保证。正解是在用户包的 `moon.pkg` 里写 `formatter(ignore: ["*_templ.mbt"])`(**已实测有效**)。需要:更正 port-research §6.1、更正 TASKS.md 里 T2.15/T2.16 的相应措辞、把这条写进 `examples/hello/moon.pkg` 与 README · 前置 T2.17 · S
+- [x] **T2.18** 大写模板名生成非法 MoonBit — 生成期明确报错,templ 侧允许 `templ Hello()` 而 MoonBit 的 `fn` 名必须小写写起。**实测证据**:`templ Hello()` 产出 `pub fn Hello() -> Unit` → `Parse error, unexpected token `(`, you may expect `::``;带接收者的 `templ (m : Model) Render()` 产出 `pub fn Model::Render(...)` → `Expected lower case identifier for name of `fn``。报错要指出是模板名的大小写问题并给出模板名与位置,不要让它变成用户看不懂的产物编译错误 · 前置 T2.15 · S
+  - 新增 `Generator::check_name`,在 `write_template` 一开头、**写任何东西之前**调用(所以报错里的名字就是源码里的那个,不会指向半成品产物)。判据是**首字符必须是 `a`–`z` 或 `_`**,与实测一致:`pub fn _leading()` / `pub fn foo_bar()` / `pub fn fooBar2()` 都合法,`pub fn Hello()` 与 `pub fn 9lives()` 都是 parse error(MoonBit 解析器把首字母大写当类型名)。名字**中间**的大写不管。
+  - 报错文案:`a template name must start with a lowercase letter or `_`, because it becomes a MoonBit function name, but this one is `Hello` (in template `Hello`)`。带接收者的模板走同一条规则(方法名同样不能大写)。
+  - **顺带修掉三个既有测试:它们在断言 `Greeting` 的产物**,而现在 `check_name` 把它们挡下来了 —— 也就是说这些期望值本来就是在断言一段**编译不过的 MoonBit**。改成 `greeting` 后通过。这是 T2.18 之外的一个真实修正:`Generator` 的接收者路径此前**只被断言过产物文本,从未真正编译过**。
+  - 补做端到端验证(临时包,已移走):`templ (self : Model) greeting() { <div>Hello, { self.name }!</div> }` → `pub fn Model::greeting(self : Model) -> @rt.Component`,配 `@rt` 与 `struct Model` 后 **`moon build` 零警告通过**,运行打出 `<div>Hello, world!</div>`。接收者路径至此才算真的验证过。
+  - 观察到但**不在本次范围**:接收者**类型**名若小写(如 `(m : model)`)产物同样编译不过,但那种情况下用户自己的 `struct model {}` 本来就已经非法,报错点也落在用户自己的代码上,不急着在这里拦。
 
 ---
 
