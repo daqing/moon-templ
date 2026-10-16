@@ -4,7 +4,7 @@
 拆分日期:2026-10-17
 目标:把 `a-h/templ` 的模板引擎在 MoonBit 中重新实现
 
-**进度:40 / 58**
+**进度:41 / 58**
 
 ---
 
@@ -19,7 +19,7 @@
   | T1 runtime 地基 | 5 | 5 | 0 |
   | T2 parser + generator 骨架 | 19 | 19 | 0 |
   | T3 MVP 完整 | 11 | 11 | 0 |
-  | T4 属性特殊语义 | 8 | 0 | 0 |
+  | T4 属性特殊语义 | 8 | 1 | 0 |
   | T5 工具链与打磨 | 5 | 0 | 1(T5.2) |
   | T6 可选 / 远期 | 5 | 0 | 3 |
 
@@ -169,7 +169,17 @@
 
 > templ 对四类属性有超出"输出键值对"的特殊处理(port-research §1.2)。这一阶段把语义补齐。
 
-- [ ] **T4.1** runtime:`Attributes` / `RenderAttributes` — 单测:map 与 KV 数组两种输入 · 前置 T1.1 · M
+- [x] **T4.1** runtime:`Attributes` / `RenderAttributes` — 单测:map 与 KV 数组两种输入 · 前置 T1.1 · M
+  - **MoonBit 不允许给"不属于本包的类型"实现 trait。** 实测(临时建两个包:A 定义 `pub(open) trait T`,并 `impl T for Map[String, Int]` / `impl T for Array[String]`;B 调 `@a.use_it(m)`):两个 impl 都只报 `Unused trait implementation`,B 侧是 `Type Map[String, Int] does not implement trait ...: no ``impl`` is defined`。也就是说 templ 那种"`Attributes`(map)与 `OrderedAttributes`(slice)各实现一次 `Attributer`"的写法在这里编译不出来 —— `Map` 属于 core,`Array` 是内建类型。
+  - 形状据此改:两种输入合成**一个** `Attributes` 结构(内部 `priv items : Array[KV[String, AttributeValue]]`),由两个构造器给出 —— `from_map`(按名排序,对齐 templ 的 map)与 `ordered`(保持给定顺序,对齐 templ 的 OrderedAttributes)。`Attributer` trait 仍然保留,但只对我们自己的类型实现;`pub(open)` 让调用方还能给自己的类型实现它,自定义属性来源的路没堵死。
+  - **`pub impl` 与 `impl` 的差别是实测出来的**:`impl Attributer for Attributes`(不带 `pub`)一样被报 `Unused trait implementation`,下游也看不见;加上 `pub` 才对下游可用。这条对任何"要给下游用的 trait impl"都成立。
+  - **`typealias` 是 `.mbti` 的关键字,源码里要写 `pub type`**:写 `pub typealias` 直接 parse error(`unexpected token id`)。
+  - **泛型函数的类型参数写在名字前面**:`pub fn[A : Attributer] render_attributes(...)`;写成 `fn f[T](...)` 报 `unexpected ``fn f[T]``, you may expect ``fn[T] f```。
+  - 动态类型没有了:`map[string]any` 上的 switch 换成 `AttributeValue` 的三个变体 `Value(String)` / `Flag(Bool)` / `Conditional(KV[String, Bool])`。templ 的 `*string`、`*bool`、`func() bool` 三种情形在这里落在 `Value` / `Flag` 上(空指针等于"不出现",`func() bool` 由调用方求值),理由是没有 `any` 就没有运行期分派。
+  - 排序沿用 T3.9 的结论:map 的项用 **`lexical_compare`** 排,不能用 MoonBit 的 `Compare for String`(先比长度),否则 `zz` 会排在 `aaa` 前面;有单测钉住这条。templ 是在**渲染时**排序(`Items()`),我们是在**构造时**排 —— `items` 私有、构造后改不了,两者等价。
+  - 单测 8 条:map 顺序无关、ordered 保序、`false` 标志整条消失、条件属性、名字与值转义、空集、按名而非按长度排序。
+  - 端到端实测:`<div class="box" { attrs... }>hi</div>` 走 CLI 生成 → `moon build`/`moon run` 打出 `<div class="box" hidden id="x&amp;y">hi</div>`(临时包已移走)。顺带把 T3.10 记的那个缺口补上:该条目里"页面故意不用 `{ attrs... }`"的原因(运行时没有实现)至此消失。
+  - `moon check` 零警告(补了 `pub extend Attributes with Attributer::{items}` 消掉 `implicit_impl_as_method`);`moon test` **327 passed / 0 failed**(较 T3.11 的 319 多出 8 个 runtime 单测)。
 - [ ] **T4.2** runtime:`CSSClasses` / `KV` — 单测:常量与表达式混合、空值剔除 · 前置 T4.1 · M
 - [ ] **T4.3** `class` 属性特殊处理 — 表达式走 `CSSClasses`,常量值 join 消空白;对 templ golden 校验 · 前置 T4.2、T3.1 · M
 - [ ] **T4.4** `style` 属性 sanitize — 对 templ golden 校验 · 前置 T4.1 · M
