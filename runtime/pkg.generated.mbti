@@ -1,0 +1,38 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "daqing/moon-templ/runtime"
+
+// Values
+pub fn component((RenderCtx, &Logger) -> Unit) -> Component
+
+pub fn escape(String) -> String
+
+pub fn raw(String) -> Component
+
+pub fn[T : Show] write_any(&Logger, T) -> Unit
+
+pub fn write_escaped(&Logger, String) -> Unit
+
+// Errors
+
+// Types and methods
+pub struct Component {
+  // private fields
+}
+pub fn Component::nop() -> Self
+pub fn Component::output(Self, &Logger) -> Unit
+pub fn Component::render(Self, RenderCtx, &Logger) -> Unit
+pub fn Component::to_string(Self) -> String
+pub fn Component::with_children(Self, Self) -> Self
+pub impl Show for Component
+
+pub struct RenderCtx {
+  children : Component
+  nonce : String
+}
+pub fn RenderCtx::clear_children(Self) -> Self
+pub fn RenderCtx::new() -> Self
+pub fn RenderCtx::with_children(Self, Component) -> Self
+
+// Type aliases
+
+// Traits

@@ -228,7 +228,7 @@ templ **不做上下文感知转义**(不像 Go 的 `html/template`),只做这�
 
 以下原型均在本机 `moon 0.1.20261012` / `moonc v0.10.15` 上实际编译运行通过。
 
-### 3.1 运行时设计(实测通过)
+### 3.1 运行时设计(已落地于 `runtime/`,9 个单测通过、零警告)
 
 ```moonbit
 ///|
@@ -239,7 +239,27 @@ pub struct RenderCtx {
 
 ///|
 pub struct Component {
-  render : (RenderCtx, &Logger) -> Unit
+  priv render_fn : (RenderCtx, &Logger) -> Unit
+}
+
+///|
+pub fn component(render : (RenderCtx, &Logger) -> Unit) -> Component {
+  { render_fn: render, }
+}
+
+///|
+pub fn Component::render(self : Component, ctx : RenderCtx, w : &Logger) -> Unit {
+  (self.render_fn)(ctx, w)
+}
+
+///|
+pub fn RenderCtx::with_children(self : RenderCtx, children : Component) -> RenderCtx {
+  { children, nonce: self.nonce, }
+}
+
+///|
+pub fn RenderCtx::clear_children(self : RenderCtx) -> RenderCtx {
+  { children: Component::nop(), nonce: self.nonce, }
 }
 
 ///|
@@ -253,12 +273,19 @@ pub impl Show for Component with fn output(self, logger) {
 }
 
 ///|
+pub extend Component with Show::{to_string, output}
+
+///|
 pub fn[T : Show] write_any(w : &Logger, v : T) -> Unit {
   write_escaped(w, v.to_string())
 }
 ```
 
 `impl Show for Component` 让 `.to_string()` / `println(html)` 免费可用。
+
+**`clear_children` 是必需的,不是可选项。** 这一点在原型阶段没暴露,是 T1.1 写单测时才发现的:只在调用点 `with_children` 而不在组件体内清除,children 会**一路漏到所有后代组件**。templ 用 `ClearChildren(ctx)` 解决同一问题,生成的代码形状是「开头取出 children → 立即清空 ctx → 后面所有嵌套渲染都看不到 children」。单测 `children do not leak down to grandchildren` 锁住这个语义,生成器必须在每个组件体开头发射这两行(见 §3.2)。
+
+**结构字段的两个约束**(实测):字段默认就是 public,写 `pub` 会报 `redundant_modifier` 警告,要私有必须写 `priv`;而记录字段不能当函数调用(`self.render(ctx, w)` 报 E4015),所以内部字段取名 `render_fn`,对外暴露 `Component::render` 方法 —— 这样生成代码里 `ctx.children.render(ctx, w)` 才是自然写法。
 
 ### 3.2 生成代码的形状(实测编译+渲染通过)
 
@@ -277,14 +304,24 @@ templ layout(title string) {
 ///|
 pub fn layout(title : String) -> @rt.Component {
   @rt.component(fn(ctx, w) {
+    let children = ctx.children
+    let ctx = ctx.clear_children()
     w.write_string("<html><head><title>")
     @rt.write_any(w, title)
     w.write_string("</title></head><body>")
-    ctx.children.render(ctx, w)
+    children.render(ctx, w)
     w.write_string("</body></html>")
   })
 }
 ```
+
+开头两行对应 templ 的 `GetChildren` + `ClearChildren`,用来阻断 children 向孙组件泄漏(见 §3.1)。**但不能无脑照发** —— 发射规则取决于组件体内容,否则会撞上 `unused_value` 警告:
+
+| 组件体含 | 发射内容 |
+|---|---|
+| `{ children... }` | `let children = ctx.children` + `let ctx = ctx.clear_children()`,正文用 `children.render(ctx, w)` |
+| 无 `{ children... }`,但有嵌套组件调用 | 只发 `let ctx = ctx.clear_children()`(不绑定 `children`,避免未使用变量) |
+| 两者都没有 | 整段前导都省掉 —— ctx 不会被传给任何人,清不清都一样 |
 
 带 children 的调用点:`layout("Home").with_children(child).render(ctx, w)`
 
@@ -298,6 +335,7 @@ pub fn layout(title : String) -> @rt.Component {
 |---|---|---|
 | `ambiguous_block` | 单字段 struct 字面量 `{ render }` 被判为歧义 | 生成时加尾逗号 `{ render, }` |
 | `unused_value` | 嵌套闭包里没用到 `ctx`(如纯静态子组件) | 生成 `fn(_ctx, w)` |
+| `unused_value` | children 前导里的 `let children = ctx.children`,但模板没用到它 | 按上表分级发射(见 §3.2);别为了图省事无脑照抄前导 |
 | `implicit_impl_as_method` | runtime 里 `impl Show for Component` 的 `to_string`/`output` 被隐式提升,已废弃 | runtime 补 `pub extend Component with Show::{to_string, output}` |
 | `deprecated` | `StringBuilder::new()` | 用 `StringBuilder()` |
 
@@ -397,7 +435,7 @@ moon build                    # 普通编译,零配置
 | `if x { } else { }` | 同 | |
 | `for i, v := range items { }` | `for v in items { }` | **必须改**:MoonBit 的 `for..in` |
 | `for i := 0; i < n; i++ { }` | `for i = 0; i < n; i = i + 1 { }` | MoonBit C 风格 for 语法 |
-| `switch v { case "a": }` | `match v { "a" => ... }` | **待决策**,见 §8 |
+| `switch v { case "a": }` | `match v { "a" => ... }` | **已拍板**:用 MoonBit 原生 `match`,不用 Go 风格 `switch`(见 §8) |
 | `{{ x := 1 }}` | `{{ let x = 1 }}` | MoonBit 用 `let` |
 | `package main` | **不需要** | MoonBit 的包由目录 + `moon.pkg` 决定,源文件无包声明 |
 | `import (...)` | **不放在 .templ 里** | MoonBit 的 import 在 `moon.pkg`,生成代码用 `@alias.` |
@@ -512,12 +550,12 @@ moon-templ/                      # 本仓库(monorepo,三个 module 或一个 mo
 
 ## 8. 待决策点与风险
 
-**需要你拍板的设计决策:**
+**设计决策(已于 2026-10-17 拍板,对应 TASKS.md 的 T0.1–T0.4):**
 
-1. **`switch` vs `match`。** templ 用 Go 的 `switch`;MoonBit 有更强的 `match`(模式匹配、解构)。建议直接改用 `match`,语法与 MoonBit 一致,且表达力更好 —— 但这会让 `.templ` 文件无法逐字复用 templ 的语法,迁移工具需要改写。
-2. **产物是否提交进仓库。** 提交(照搬 templ)vs 纯 `pre-build` 生成不提交。前者 DX 好、可 review;后者仓库干净但每次都依赖构建钩子。
-3. **错误模型。** MVP 用不会失败的 `StringBuilder`(组件签名 `-> Component`,无 `raise`);后续要不要支持流式写入(签名变 `raise`)?两者 API 不兼容,最好一开始定。
-4. **`.templ` 扩展名。** 沿用 `.templ`(方便迁移/借鉴文档)还是换 `.mtpl`(justjavac 已占用)避免混淆。
+1. **控制流用 MoonBit 原生 `match`,不用 Go 风格的 `switch`。** 与 MoonBit 语法一致,且支持模式匹配与解构。代价:`.templ` 文件无法逐字复用 templ 的语法,迁移工具需改写这一部分。
+2. **生成产物提交进仓库,照搬 templ 的 `_templ.go` 模式。** `moon-templ generate ./...` 生成后 `git add`,编译零配置。绕开了 `pre-build` 必须逐文件声明输入输出的 DX 痛点;`pre-build` 作为可选便利功能另行提供。
+3. **错误模型:MVP 不带 `raise`。** 组件签名为 `(RenderCtx, &Logger) -> Unit`,`StringBuilder` 写入不会失败。关键收益是**可以 `impl Show for Component`**(`Show::output` 不允许 raise),`println(html)` / `.to_string()` 免费可用。流式写入(签名带 `raise`)作为后续演进,届时需放弃 `Show`。
+4. **扩展名沿用 `.templ`。** 便于对照 templ.guide 文档、复用 golden 样例、迁移已有模板时文件名不变。与 Go 版 templ 同名带来的混淆风险可接受。
 
 **主要风险:**
 
@@ -564,6 +602,9 @@ moon-templ/                      # 本仓库(monorepo,三个 module 或一个 mo
 | 18 | **默认 target 是 wasm** | `moon.mod` 里 `preferred_target = "wasm"`。好消息:实测 `@fs` / `@env` **在 wasm 下都正常工作**,CLI 不必强制切 native |
 | 19 | **旧 `moon.mod.json` 格式的包已不可用** | 报 `no longer supported. Run moon fmt to migrate`。选依赖前先确认迁移状态(实测 `illusory0x0/simple_parserc`、`moonbit-community/XMLParser` 因此不可用) |
 | 20 | **没有 parser combinator 官方库** | 推荐 `StringView` 解构式写法:`for view = src { match view { ['<','%','=', .. r] => ... } }` —— 消耗完直接返回剩余 view,无需手工递增 `pos` |
+| 21 | **struct 字段默认就是 public** | 字段上再写 `pub` 报 `redundant_modifier` 警告;要私有必须写 `priv`。**产物要求 warning-clean,生成器定义 struct 时必须知道这条** |
+| 22 | **记录字段不能当函数调用** | `self.render(ctx, w)` 报 E4015 `Type Component has no method render`,提示改用 `(self.render)(...)`。故 runtime 采用 `priv render_fn` 字段 + `Component::render` 真方法 —— 这样生成代码里 `ctx.children.render(ctx, w)` 才是自然写法,不必到处写括号 |
+| 23 | **`moon info` 的产物是 `pkg.generated.mbti`** | 不是旧约定的 `<包名>.mbti`。找接口文件时别找错名字 |
 
 ---
 

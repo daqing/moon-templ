@@ -111,10 +111,10 @@ Phase 2 供给(喂给主链):
 |---|---|---|---|---|
 | T3.1 | 表达式属性 `name={ expr }` | 生成 `resolve_attribute_value` 调用;快照测试 | T2.4, T2.15 | M |
 | T3.2 | 组件调用 `@expr` / `@expr { }` | 生成 `.with_children(...).render(...)`;校验 `@` 前必须有空白 | T3.1 | M |
-| T3.3 | `{ children... }` | 生成 `ctx.children.render(ctx, w)`;单测验证 children **不透传**到孙子组件 | T3.2 | S |
+| T3.3 | `{ children... }` + children 前导的三级发射规则 | 按 port-research §3.2 的表分级发射(避免 `unused_value`);单测验证 children **不透传**到孙子组件。T1.1 已把 runtime 侧语义和单测锁住,这里只需按规则生成 | T3.2 | M |
 | T3.4 | `if` / `else if` / `else` | 条件表达式原文抄进产物交给 MoonBit 编译器校验;校验 `{` 后必须换行 | T2.15 | M |
 | T3.5 | `for`:C 风格与 `for..in` 两种形式 | 两种形式各有快照;注意 MoonBit C 风格 for 写 `i = i + 1` | T3.4 | M |
-| T3.6 | 控制流分支:按 **T0.1** 决定实现 `match` 或 `switch` | 快照测试 | T3.5 | M |
+| T3.6 | 控制流分支:`match`(T0.1 已定,不用 Go 风格 `switch`) | 快照测试;需支持解构模式 `Some(x) => { ... }` | T3.5 | M |
 | T3.7 | `{ attrs... }` spread | 生成 `@rt.render_attributes` 调用 | T3.1 | M |
 | T3.8 | `{{ code }}` 原样写入函数体 | 单测:`{{ let x = 1 }}` 在产物中按 `let` 出现 | T2.15 | S |
 | T3.9 | 目录扫描 + 批量生成(`generate ./...`) | 一条命令生成整目录;跳过无变化文件(等价 templ `-lazy`) | T2.14 | M |
