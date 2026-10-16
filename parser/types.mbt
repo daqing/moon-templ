@@ -1,0 +1,68 @@
+///|
+/// A node inside a template body. Recursive through `Element`.
+pub(all) enum Node {
+  DocType
+  HTMLComment(String)
+  Element(Element)
+  Text(String)
+  StringExpression(String)
+} derive(Debug, Eq)
+
+///|
+pub(all) struct Element {
+  name : String
+  attrs : Array[Attribute]
+  children : Array[Node]
+  self_closing : Bool
+} derive(Debug, Eq)
+
+///|
+pub(all) enum Attribute {
+  Constant(name~ : String, value~ : String)
+  Bool(name~ : String)
+} derive(Debug, Eq)
+
+///|
+/// A `templ Name(params) { ... }` block. `params` keeps the source spelling of
+/// the parameter list, e.g. `name : String`, and is copied verbatim into the
+/// generated function header.
+pub(all) struct Template {
+  name : String
+  params : String
+  nodes : Array[Node]
+} derive(Debug, Eq)
+
+///|
+pub(all) struct TemplateFile {
+  templates : Array[Template]
+} derive(Debug, Eq)
+
+///|
+pub extend Node with Eq::{equal, not_equal}
+
+///|
+pub extend Node with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend Element with Eq::{equal, not_equal}
+
+///|
+pub extend Element with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend Attribute with Eq::{equal, not_equal}
+
+///|
+pub extend Attribute with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend Template with Eq::{equal, not_equal}
+
+///|
+pub extend Template with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend TemplateFile with Eq::{equal, not_equal}
+
+///|
+pub extend TemplateFile with @moonbitlang/core/debug.Debug::{to_repr}

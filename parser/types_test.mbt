@@ -1,0 +1,22 @@
+///|
+test "ast values are constructible from outside the package" {
+  let el : @parser.Element = {
+    name: "div",
+    attrs: [@parser.Constant(name="class", value="a")],
+    children: [@parser.Text("hi"), @parser.StringExpression("name")],
+    self_closing: false,
+  }
+  let t : @parser.Template = {
+    name: "hello",
+    params: "name : String",
+    nodes: [@parser.Element(el), @parser.DocType, @parser.HTMLComment("c")],
+  }
+  assert_eq(t.nodes.length(), 3)
+  assert_eq(t.nodes[0], @parser.Element(el))
+}
+
+///|
+test "boolean attribute holds just a name" {
+  assert_eq(@parser.Bool(name="disabled"), @parser.Bool(name="disabled"))
+  assert_true(@parser.Bool(name="disabled") is Bool(name="disabled"))
+}

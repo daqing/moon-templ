@@ -605,6 +605,8 @@ moon-templ/                      # 本仓库(monorepo,三个 module 或一个 mo
 | 21 | **struct 字段默认就是 public** | 字段上再写 `pub` 报 `redundant_modifier` 警告;要私有必须写 `priv`。**产物要求 warning-clean,生成器定义 struct 时必须知道这条** |
 | 22 | **记录字段不能当函数调用** | `self.render(ctx, w)` 报 E4015 `Type Component has no method render`,提示改用 `(self.render)(...)`。故 runtime 采用 `priv render_fn` 字段 + `Component::render` 真方法 —— 这样生成代码里 `ctx.children.render(ctx, w)` 才是自然写法,不必到处写括号 |
 | 23 | **`moon info` 的产物是 `pkg.generated.mbti`** | 不是旧约定的 `<包名>.mbti`。找接口文件时别找错名字 |
+| 24 | **`derive(Debug, Eq)` 会触发 `implicit_impl_as_method` 警告** | 每个类型要为每个 derive 的 trait 补显式 `extend`:`pub extend Node with Eq::{equal, not_equal}`、`pub extend Node with @moonbitlang/core/debug.Debug::{to_repr}`。另外凡引用 `@moonbitlang/core/debug` 就必须在 `moon.pkg` 里 `import { "moonbitlang/core/debug" }`,否则报 `core_package_not_imported`。**5 个类型 = 10 条 extend,是本项目定义公开类型的固定成本** |
+| 25 | **struct 构造用字面量语法,不是构造器** | `Element(name="div", ...)` 报 E4085;要写 `let e : @pkg.Element = { name: "div", ... }`。带 `~` 标签的只有 **enum 构造器**(如 `Constant(name=..., value=...)`) |
 
 ---
 

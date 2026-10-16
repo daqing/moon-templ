@@ -1,11 +1,59 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "daqing/moon-templ/parser"
 
+import {
+  "moonbitlang/core/debug",
+}
+
 // Values
 
 // Errors
 
 // Types and methods
+pub(all) enum Attribute {
+  Constant(name~ : String, value~ : String)
+  Bool(name~ : String)
+} derive(Eq, @debug.Debug)
+pub fn Attribute::equal(Self, Self) -> Bool
+pub fn Attribute::not_equal(Self, Self) -> Bool
+pub fn Attribute::to_repr(Self) -> @debug.Repr
+
+pub(all) struct Element {
+  name : String
+  attrs : Array[Attribute]
+  children : Array[Node]
+  self_closing : Bool
+} derive(Eq, @debug.Debug)
+pub fn Element::equal(Self, Self) -> Bool
+pub fn Element::not_equal(Self, Self) -> Bool
+pub fn Element::to_repr(Self) -> @debug.Repr
+
+pub(all) enum Node {
+  DocType
+  HTMLComment(String)
+  Element(Element)
+  Text(String)
+  StringExpression(String)
+} derive(Eq, @debug.Debug)
+pub fn Node::equal(Self, Self) -> Bool
+pub fn Node::not_equal(Self, Self) -> Bool
+pub fn Node::to_repr(Self) -> @debug.Repr
+
+pub(all) struct Template {
+  name : String
+  params : String
+  nodes : Array[Node]
+} derive(Eq, @debug.Debug)
+pub fn Template::equal(Self, Self) -> Bool
+pub fn Template::not_equal(Self, Self) -> Bool
+pub fn Template::to_repr(Self) -> @debug.Repr
+
+pub(all) struct TemplateFile {
+  templates : Array[Template]
+} derive(Eq, @debug.Debug)
+pub fn TemplateFile::equal(Self, Self) -> Bool
+pub fn TemplateFile::not_equal(Self, Self) -> Bool
+pub fn TemplateFile::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 
