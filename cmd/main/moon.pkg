@@ -1,5 +1,7 @@
-// import {
-//   "daqing/moon-templ" @lib,
-// }
+import {
+  "daqing/moon-templ/cli",
+  "moonbitlang/core/env",
+  "moonbitlang/x/sys",
+}
 
 pkgtype(kind: "executable")

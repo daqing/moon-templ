@@ -1,0 +1,5 @@
+import {
+  "daqing/moon-templ/parser",
+  "daqing/moon-templ/generator",
+  "moonbitlang/x/fs",
+}

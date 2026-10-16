@@ -1,0 +1,22 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "daqing/moon-templ/cli"
+
+// Values
+pub const USAGE : String = "moon-templ generate <file.templ>"
+
+pub fn generate_file(String) -> String raise CliError
+
+pub fn output_path(String) -> String
+
+pub fn run(ArrayView[String]) -> Int
+
+// Errors
+pub(all) suberror CliError {
+  CliError(message~ : String)
+}
+
+// Types and methods
+
+// Type aliases
+
+// Traits

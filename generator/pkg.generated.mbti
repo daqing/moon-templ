@@ -9,6 +9,8 @@ import {
 // Values
 pub fn generate(@parser.TemplateFile) -> GeneratedFile raise GenerateError
 
+pub fn generated_header() -> String
+
 pub fn string_literal(String) -> String
 
 // Errors

@@ -1,7 +1,7 @@
 ///|
-/// Entry point for the CLI or runnable program in this template.
-/// Keep main focused; move logic into the library package.
-/// Run with `moon run cmd/main` from the project root.
+/// The `moon-templ` entry point. `@env.args()` carries the executable first, so
+/// it goes straight to `@cli.run` as it arrives; everything else lives in
+/// `cli/`, where it can be tested without a process.
 fn main {
-  println("Hello")
+  @sys.exit(@cli.run(@env.args()))
 }
