@@ -64,10 +64,29 @@ pub fn Element::equal(Self, Self) -> Bool
 pub fn Element::not_equal(Self, Self) -> Bool
 pub fn Element::to_repr(Self) -> @debug.Repr
 
+pub(all) struct ElseIf {
+  condition : String
+  then : Array[Node]
+} derive(Eq, @debug.Debug)
+pub fn ElseIf::equal(Self, Self) -> Bool
+pub fn ElseIf::not_equal(Self, Self) -> Bool
+pub fn ElseIf::to_repr(Self) -> @debug.Repr
+
+pub(all) struct IfExpression {
+  condition : String
+  then : Array[Node]
+  else_ifs : Array[ElseIf]
+  else_ : Array[Node]
+} derive(Eq, @debug.Debug)
+pub fn IfExpression::equal(Self, Self) -> Bool
+pub fn IfExpression::not_equal(Self, Self) -> Bool
+pub fn IfExpression::to_repr(Self) -> @debug.Repr
+
 pub(all) enum Node {
   DocType(String)
   HTMLComment(String)
   Call(Call)
+  If(IfExpression)
   Element(Element)
   RawElement(RawElement)
   Text(String)

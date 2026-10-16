@@ -137,6 +137,79 @@ fn scan_expr(
 }
 
 ///|
+/// Scan the condition of an `if` head: everything up to the `{` that opens the
+/// block, which is left where it stands. It is the same scan as `scan_expr` with
+/// the same corners — a bracket that nests, a `{` inside a string, a rune or a
+/// comment — ending at the other brace. `None` when the source runs out first,
+/// which means the statement never opened a block.
+fn scan_condition(
+  src : StringView,
+  depth : Int32,
+  buf : StringBuilder,
+) -> StringView? {
+  match src {
+    [] => None
+    ['{', ..] if depth == 0 => Some(src)
+    ['{', .. rest] => {
+      buf.write_char('{')
+      scan_condition(rest, depth + 1, buf)
+    }
+    ['(', .. rest] => {
+      buf.write_char('(')
+      scan_condition(rest, depth + 1, buf)
+    }
+    ['[', .. rest] => {
+      buf.write_char('[')
+      scan_condition(rest, depth + 1, buf)
+    }
+    [')', .. rest] => {
+      buf.write_char(')')
+      scan_condition(rest, dec(depth), buf)
+    }
+    [']', .. rest] => {
+      buf.write_char(']')
+      scan_condition(rest, dec(depth), buf)
+    }
+    ['}', .. rest] => {
+      buf.write_char('}')
+      scan_condition(rest, dec(depth), buf)
+    }
+    ['"', .. rest] => {
+      buf.write_char('"')
+      match scan_string(rest, buf) {
+        None => None
+        Some(r) => scan_condition(r, depth, buf)
+      }
+    }
+    ['\'', .. rest] => {
+      buf.write_char('\'')
+      match scan_rune(rest, buf) {
+        None => None
+        Some(r) => scan_condition(r, depth, buf)
+      }
+    }
+    ['/', '/', .. rest] => {
+      buf.write_string("//")
+      match scan_line_comment(rest, buf) {
+        None => None
+        Some(r) => scan_condition(r, depth, buf)
+      }
+    }
+    ['/', '*', .. rest] => {
+      buf.write_string("/*")
+      match scan_block_comment(rest, buf) {
+        None => None
+        Some(r) => scan_condition(r, depth, buf)
+      }
+    }
+    [c, .. rest] => {
+      buf.write_char(c)
+      scan_condition(rest, depth, buf)
+    }
+  }
+}
+
+///|
 fn scan_string(src : StringView, buf : StringBuilder) -> StringView? {
   match src {
     [] => None

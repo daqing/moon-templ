@@ -8,6 +8,8 @@ pub(all) enum Node {
   HTMLComment(String)
   /// `@expr` or `@expr { ... }`.
   Call(Call)
+  /// `if cond { ... }` with its `else if` chain and its `else`.
+  If(IfExpression)
   Element(Element)
   RawElement(RawElement)
   Text(String)
@@ -25,6 +27,28 @@ pub(all) enum Node {
 pub(all) struct Call {
   expression : String
   children : Array[Node]
+} derive(Debug, Eq)
+
+///|
+/// `if cond { ... } else if cond { ... } else { ... }`.
+///
+/// `condition` is the source text between the keyword and the block, copied
+/// through as it stands, indentation and all: what an `if` may hold is what
+/// MoonBit accepts, so the compiler is the one that checks it. An `else` that
+/// holds nothing is no else branch at all, which is what an empty `else_` says —
+/// templ drops the branch for the same reason.
+pub(all) struct IfExpression {
+  condition : String
+  then : Array[Node]
+  else_ifs : Array[ElseIf]
+  else_ : Array[Node]
+} derive(Debug, Eq)
+
+///|
+/// One `else if cond { ... }` of an `if`.
+pub(all) struct ElseIf {
+  condition : String
+  then : Array[Node]
 } derive(Debug, Eq)
 
 ///|
@@ -81,6 +105,18 @@ pub extend Call with Eq::{equal, not_equal}
 
 ///|
 pub extend Call with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend IfExpression with Eq::{equal, not_equal}
+
+///|
+pub extend IfExpression with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend ElseIf with Eq::{equal, not_equal}
+
+///|
+pub extend ElseIf with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
 pub extend Element with Eq::{equal, not_equal}

@@ -148,6 +148,7 @@ fn reads_ctx(nodes : Array[@parser.Node]) -> Bool {
   for node in nodes {
     match node {
       Call(_) | ChildrenExpression => return true
+      If(expr) => if any_if_body(expr, reads_ctx) { return true }
       Element(element) => if reads_ctx(element.children) { return true }
       Text(_)
       | StringExpression(_)
@@ -171,6 +172,7 @@ fn renders_children(nodes : Array[@parser.Node]) -> Bool {
     match node {
       ChildrenExpression => return true
       Call(call) => if renders_children(call.children) { return true }
+      If(expr) => if any_if_body(expr, renders_children) { return true }
       Element(element) => if renders_children(element.children) { return true }
       Text(_)
       | StringExpression(_)
@@ -248,6 +250,7 @@ fn emits_output(nodes : Array[@parser.Node]) -> Bool {
     match node {
       StringExpression(expr) => if !expr.trim().is_empty() { return true }
       Text(text) => if !text.is_empty() { return true }
+      If(expr) => if any_if_body(expr, emits_output) { return true }
       Call(_)
       | ChildrenExpression
       | Element(_)
@@ -352,6 +355,13 @@ fn mentions_in(nodes : Array[@parser.Node], name : String) -> Bool {
           mentions_in(call.children, name) {
           return true
         }
+      If(expr) =>
+        // The condition is copied into the generated file, so a parameter read
+        // only there is still a parameter the body uses.
+        if mentions(expr.condition[:], name[:], None) ||
+          any_if_body(expr, fn(nodes) { mentions_in(nodes, name) }) {
+          return true
+        }
       ChildrenExpression => ()
       Element(element) =>
         if mentions_in_attrs(element.attrs, name) ||
@@ -436,6 +446,7 @@ fn Generator::write_node(
     HTMLComment(contents) =>
       self.w.write_literal(level, "<!--" + contents + "-->")
     Call(call) => self.write_call(call, level)
+    If(expr) => self.write_if(expr, level)
     ChildrenExpression => self.write_children_expression(level)
     Element(element) => self.write_element(element, level)
     RawElement(raw) => self.write_raw_element(raw, level)
@@ -483,6 +494,62 @@ fn Generator::write_children_expression(
   level : Int32,
 ) -> Unit {
   self.w.write_indent(level, "children.render(ctx, w)\n")
+}
+
+///|
+/// An `if`, its `else if` chain and its `else`, written as the same statement in
+/// MoonBit. Each condition is template source copied through as it stands: what
+/// an `if` may ask is a MoonBit expression, so the compiler that reads the
+/// generated file is the one that checks it, and a condition the template got
+/// wrong is reported against the template's own words.
+///
+/// An `else` with nothing in it produces no branch at all, which is what templ
+/// does with one: an empty block has no nodes to write, so the statement that
+/// comes out is the same as the one without the `else`.
+fn Generator::write_if(
+  self : Generator,
+  expr : @parser.IfExpression,
+  level : Int32,
+) -> Unit raise GenerateError {
+  self.w.write_indent(level, "if " + expr.condition + " {\n")
+  self.write_nodes(expr.then, level + 1)
+  for branch in expr.else_ifs {
+    self.w.write_indent(level, "} else if " + branch.condition + " {\n")
+    self.write_nodes(branch.then, level + 1)
+  }
+  if !expr.else_.is_empty() {
+    self.w.write_indent(level, "} else {\n")
+    self.write_nodes(expr.else_, level + 1)
+  }
+  self.w.write_indent(level, "}\n")
+}
+
+///|
+/// The bodies of an `if`, in the order they are written. An empty `else` is not
+/// among them, since a body with no nodes is not one.
+fn if_bodies(expr : @parser.IfExpression) -> Array[Array[@parser.Node]] {
+  let out : Array[Array[@parser.Node]] = [expr.then]
+  for branch in expr.else_ifs {
+    out.push(branch.then)
+  }
+  if !expr.else_.is_empty() {
+    out.push(expr.else_)
+  }
+  out
+}
+
+///|
+/// Whether any of an `if`'s bodies satisfies `predicate`.
+fn any_if_body(
+  expr : @parser.IfExpression,
+  predicate : (Array[@parser.Node]) -> Bool,
+) -> Bool {
+  for body in if_bodies(expr) {
+    if predicate(body) {
+      return true
+    }
+  }
+  false
 }
 
 ///|

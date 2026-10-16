@@ -1363,3 +1363,128 @@ test "differential: whitespace around a children expression" {
   assert_eq(preview("@c() { a\n{ children... } }"), "a")
   assert_eq(preview("@c() { <div>a</div> { children... } }"), "<div>a</div>")
 }
+
+///|
+// Generated from templ v0.3.1070 by the differential probe: each expected string
+// is the concatenation of the string literals templ's own generator emits for
+// that template body, with `§` standing in for the value of an expression. Every
+// branch of an `if` contributes to it, since what a branch writes stands for the
+// whole statement.
+test "differential: whitespace around an if statement" {
+  assert_eq(
+    preview(
+      "<button>Start</button>\nif firstIf {\n<button>If</button>\n} else if secondIf {\n<button>ElseIf</button>\n} else {\n<button>Else</button>\n}\n<button>End</button>",
+    ),
+    "<button>Start</button> <button>If</button> <button>ElseIf</button> <button>Else</button> <button>End</button>",
+  )
+  assert_eq(
+    preview(
+      "<button>Start</button>\nif x == \"a\" {\n<button>If</button>\n}\n<button>End</button>",
+    ),
+    "<button>Start</button> <button>If</button> <button>End</button>",
+  )
+  assert_eq(
+    preview(
+      "<button>Start</button>\nif x == \"a\" {\n<button>If</button>\n} else {\n<button>Else</button>\n}\n<button>End</button>",
+    ),
+    "<button>Start</button> <button>If</button> <button>Else</button> <button>End</button>",
+  )
+  assert_eq(preview("a\nif x == \"a\" {\n<i>c</i>\n}"), "a <i>c</i>")
+  assert_eq(preview("if x == \"a\" {\n<i>c</i>\n}\nb"), "<i>c</i> b")
+  assert_eq(preview("a\nif x == \"a\" {\n<i>c</i>\n}\nb"), "a <i>c</i> b")
+  assert_eq(
+    preview("<div>\nif x == \"a\" {\n<i>c</i>\n}\n</div>"),
+    "<div><i>c</i></div>",
+  )
+  assert_eq(
+    preview("<div>\nif x == \"a\" {\n<i>c</i>\n}\ntext\n</div>"),
+    "<div><i>c</i> text</div>",
+  )
+  assert_eq(preview("@c() {\nif x == \"a\" {\n<i>c</i>\n}\n}"), "<i>c</i>")
+  assert_eq(
+    preview("@c() {\nif x == \"a\" {\n<i>c</i>\n}\n<p>d</p>\n}"),
+    "<i>c</i> <p>d</p>",
+  )
+  assert_eq(
+    preview("@c() {\nif x == \"a\" {\n<i>c</i>\n}\ntail\n}"),
+    "<i>c</i> tail",
+  )
+  assert_eq(
+    preview("if x == \"a\" {\n<i>c</i>\n} else {\n<i>d</i>\n}"),
+    "<i>c</i><i>d</i>",
+  )
+  assert_eq(
+    preview(
+      "x\nif x == \"a\" {\n<i>c</i>\ntail\n} else {\n<i>d</i>\ntail2\n}\ny",
+    ),
+    "x <i>c</i> tail <i>d</i> tail2 y",
+  )
+  assert_eq(
+    preview("if x == \"a\" {\n<i>c</i>\n}\nif x == \"b\" {\n<i>d</i>\n}"),
+    "<i>c</i> <i>d</i>",
+  )
+  assert_eq(
+    preview("if x == \"a\" {\nif x == \"b\" {\n<i>c</i>\n}\n}"),
+    "<i>c</i>",
+  )
+  assert_eq(preview("<i>\nif x == \"a\" {\ntail\n}\n</i>"), "<i>tail</i>")
+  assert_eq(
+    preview(
+      "<button>a</button>\nif x == \"a\" {\n<i>c</i>\n}\n<button>b</button>",
+    ),
+    "<button>a</button> <i>c</i> <button>b</button>",
+  )
+  assert_eq(
+    preview(
+      "<button>a</button> if x == \"a\" {\n<i>c</i>\n}\n<button>b</button>",
+    ),
+    "<button>a</button> <i>c</i> <button>b</button>",
+  )
+  assert_eq(
+    preview("<p>\nif x == \"a\" {\n<i>c</i>\n}\n<span>s</span>\n</p>"),
+    "<p><i>c</i> <span>s</span></p>",
+  )
+  assert_eq(
+    preview("<div>a</div> if x == \"a\" {\n<i>c</i>\n}"),
+    "<div>a</div><i>c</i>",
+  )
+  assert_eq(
+    preview("<i>a</i> if x == \"a\" {\n<i>c</i>\n}"),
+    "<i>a</i> <i>c</i>",
+  )
+  assert_eq(preview("@c() if x == \"a\" {\n<i>c</i>\n}"), "<i>c</i>")
+  assert_eq(preview("{ \"a\" } if x == \"a\" {\n<i>c</i>\n}"), "§ <i>c</i>")
+  assert_eq(
+    preview("<i>a</i>\nif x == \"a\" {\n<i>c</i>\n}\n<i>b</i>"),
+    "<i>a</i> <i>c</i> <i>b</i>",
+  )
+  assert_eq(
+    preview("<i>a</i> if x == \"a\" {\n<i>c</i>\n} else {\n<i>d</i>\n}"),
+    "<i>a</i> <i>c</i><i>d</i>",
+  )
+  assert_eq(
+    preview("<span>x</span> if x == \"a\" {\n<i>c</i>\n} y"),
+    "<span>x</span> <i>c</i> y",
+  )
+  assert_eq(preview("if x == \"a\" {\n<i>c</i>\n} { \"b\" }"), "<i>c</i> §")
+  assert_eq(
+    preview("<i>a</i>  if x == \"a\" {\n<i>c</i>\n}"),
+    "<i>a</i> <i>c</i>",
+  )
+  assert_eq(
+    preview("<i>a</i>\tif x == \"a\" {\n<i>c</i>\n}"),
+    "<i>a</i> <i>c</i>",
+  )
+  assert_eq(preview("if x == \"a\" {\n<i>c</i>\n} else { y\n}"), "<i>c</i>y")
+  assert_eq(preview("if x == \"a\" {\n<i>c</i>\n}\nelse { y\n}"), "<i>c</i>y")
+  assert_eq(
+    preview("if x == \"a\" {\n<i>c</i>\n} else if y {\n<i>d</i>\n}"),
+    "<i>c</i><i>d</i>",
+  )
+  assert_eq(
+    preview(
+      "a\nif x == \"a\" {\n<i>c</i>\n} else if y {\n<i>d</i>\n} else {\n<i>e</i>\n}\nb",
+    ),
+    "a <i>c</i> <i>d</i> <i>e</i> b",
+  )
+}

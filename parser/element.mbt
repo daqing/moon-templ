@@ -94,9 +94,14 @@ fn parse_nodes_into(
           parse_nodes_into(after, offset + consumed(src, after), stop, out)
         }
       }
+    _ if src.has_prefix("if "[:]) => {
+      let (node, rest) = parse_if(src, offset)
+      out.push(node)
+      parse_nodes_into(rest, offset + consumed(src, rest), stop, out)
+    }
     _ => {
       let buf = StringBuilder()
-      let rest = if is_space_run_before_at(src) {
+      let rest = if is_space_run_before_node(src) {
         take_space_run(src, buf)
       } else {
         take_text(src, buf, stop)
@@ -108,19 +113,23 @@ fn parse_nodes_into(
 }
 
 ///|
-/// Whether `src` is a whitespace run with nothing after it but a `@`.
+/// Whether `src` is a whitespace run with a node after it that the run belongs to
+/// the node before it rather than to itself: a call, or a statement.
 ///
-/// templ gives the whitespace that trails a node to that node, so a `@` starts a
-/// call only once nothing but whitespace stands between it and the text before
-/// it — and at the very start of a node list nobody is there to take that
-/// whitespace, which is why the run has to be read on its own rather than left
-/// to end the text before it.
-fn is_space_run_before_at(src : StringView) -> Bool {
+/// templ gives the whitespace that trails a node to that node, so a node the
+/// whitespace does not belong to begins at its first character — which is what
+/// makes `@` start a call and `if ` a statement even in the middle of a line, as
+/// long as a node ends before them. Read on its own, the run stays a gap that
+/// collapses, rather than the spaces of a line of text that survive verbatim; a
+/// node list that starts with the run has nobody before it to take that
+/// whitespace, which is why the run has to be read rather than left to end the
+/// text before it.
+fn is_space_run_before_node(src : StringView) -> Bool {
   match src {
     [c, .. rest] if is_space(c) =>
       match scan_space_run(rest) {
         ['@', ..] => true
-        _ => false
+        after => starts_statement(after)
       }
     _ => false
   }
@@ -174,6 +183,11 @@ fn parse_tag(
 /// A `@` preceded by whitespace ends it as well, leaving that whitespace to the
 /// text node after it. That is how templ separates `a @c()`, which is the text
 /// `a` and a call, from `a@c()`, which is one run of text.
+///
+/// A line break ends it too when a statement opens the next line: templ reads
+/// text up to the newline and lets its statement parsers have the start of the
+/// line, and reading the break into the text and stopping after it is the same
+/// split, at the same place.
 fn take_text(
   src : StringView,
   buf : StringBuilder,
@@ -187,11 +201,24 @@ fn take_text(
     ['<', ..] => src
     ['{', ..] => src
     [c, next, ..] if is_space(c) && next == '@' => src
+    ['\n', .. rest] if starts_statement(rest) => {
+      buf.write_char('\n')
+      rest
+    }
     [c, .. rest] => {
       buf.write_char(c)
       take_text(rest, buf, stop)
     }
   }
+}
+
+///|
+/// Whether a node list starts here with a statement rather than with text. templ
+/// guesses from the keyword alone and errors when what follows is not one, which
+/// is why `if you like` opening a line is a parse error rather than a sentence —
+/// the escape is to put the word in an expression, `{ "if" }`.
+fn starts_statement(src : StringView) -> Bool {
+  src.has_prefix("if "[:])
 }
 
 ///|
