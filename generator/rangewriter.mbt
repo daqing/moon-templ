@@ -69,7 +69,7 @@ fn RangeWriter::flush_literal(self : RangeWriter, level : Int32) -> Unit {
   }
   self.literals.push(literal)
   self.indent(level)
-  self.out.write_string("w.write_string(" + literal.escape() + ")\n")
+  self.out.write_string("w.write_string(" + string_literal(literal) + ")\n")
 }
 
 ///|

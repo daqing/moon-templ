@@ -2,6 +2,7 @@
 package "daqing/moon-templ/generator"
 
 // Values
+pub fn string_literal(String) -> String
 
 // Errors
 
