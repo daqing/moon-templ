@@ -93,6 +93,7 @@ fn Generator::write_template(
     for name in unused {
       self.w.write_indent(2, "ignore(" + name + ")\n")
     }
+    self.write_children_preamble(template.nodes, 2)
     self.write_nodes(template.nodes, 2)
     self.w.write_indent(1, "})\n")
   }
@@ -100,24 +101,77 @@ fn Generator::write_template(
 }
 
 ///|
+/// The opening of a template body, where the children of the call this component
+/// answers belong.
+///
+/// templ reads them out of the context and clears it before the body runs, so a
+/// component cannot pass its caller's children on to the components it renders
+/// itself; `RenderCtx` carries them the same way, and the runtime's
+/// `clear_children` is the same guard (port-research §3.1).
+///
+/// The preamble is not always two lines. A body that renders children binds them
+/// and goes on to render them with the cleared context; one that only renders
+/// other components clears the context and binds nothing; one that does neither
+/// needs neither line, since nothing it writes can see the context at all.
+/// Writing the lines regardless would leave the generated file with a binding
+/// nothing reads, which MoonBit reports as `unused_value`.
+fn Generator::write_children_preamble(
+  self : Generator,
+  nodes : Array[@parser.Node],
+  level : Int32,
+) -> Unit {
+  if renders_children(nodes) {
+    self.w.write_indent(level, "let children = ctx.children\n")
+  }
+  if reads_ctx(nodes) {
+    self.w.write_indent(level, "let ctx = ctx.clear_children()\n")
+  }
+}
+
+///|
 /// The parameter list of the closure a body becomes.
 ///
-/// A closure that writes nothing names its writer `_w`, and one that calls no
-/// component names its render context `_ctx`: MoonBit warns about a parameter
-/// nothing reads, and a generated file has to compile without warnings.
+/// A closure that writes nothing names its writer `_w`, and one that reads
+/// nothing out of its render context names that `_ctx`: MoonBit warns about a
+/// parameter nothing reads, and a generated file has to compile without warnings.
 fn closure_params(nodes : Array[@parser.Node]) -> String {
-  let ctx = if calls_component(nodes) { "ctx" } else { "_ctx" }
+  let ctx = if reads_ctx(nodes) { "ctx" } else { "_ctx" }
   ctx + ", " + (if emits_output(nodes) { "w" } else { "_w" })
 }
 
 ///|
-/// Whether anything in the body renders a component, which is what makes the
-/// closure's render context a name rather than an underscore.
-fn calls_component(nodes : Array[@parser.Node]) -> Bool {
+/// Whether a body reads its render context: it renders a component, or it
+/// renders the children its caller handed over. Only what this body writes
+/// itself counts — the children block of a call becomes a component with a
+/// context of its own, so whatever is nested in there reads that one instead.
+fn reads_ctx(nodes : Array[@parser.Node]) -> Bool {
   for node in nodes {
     match node {
-      Call(_) => return true
-      Element(element) => if calls_component(element.children) { return true }
+      Call(_) | ChildrenExpression => return true
+      Element(element) => if reads_ctx(element.children) { return true }
+      Text(_)
+      | StringExpression(_)
+      | RawElement(_)
+      | HTMLComment(_)
+      | DocType(_) => ()
+    }
+  }
+  false
+}
+
+///|
+/// Whether a body renders the children of the call it answers, anywhere in it.
+///
+/// A `{ children... }` inside a call's block still renders this template's
+/// children: the block becomes a component of its own, but the closure it
+/// compiles to closes over the binding the template body makes, which is why the
+/// search reaches into blocks even though `reads_ctx` does not.
+fn renders_children(nodes : Array[@parser.Node]) -> Bool {
+  for node in nodes {
+    match node {
+      ChildrenExpression => return true
+      Call(call) => if renders_children(call.children) { return true }
+      Element(element) => if renders_children(element.children) { return true }
       Text(_)
       | StringExpression(_)
       | RawElement(_)
@@ -194,8 +248,12 @@ fn emits_output(nodes : Array[@parser.Node]) -> Bool {
     match node {
       StringExpression(expr) => if !expr.trim().is_empty() { return true }
       Text(text) => if !text.is_empty() { return true }
-      Call(_) | Element(_) | RawElement(_) | HTMLComment(_) | DocType(_) =>
-        return true
+      Call(_)
+      | ChildrenExpression
+      | Element(_)
+      | RawElement(_)
+      | HTMLComment(_)
+      | DocType(_) => return true
     }
   }
   false
@@ -294,6 +352,7 @@ fn mentions_in(nodes : Array[@parser.Node], name : String) -> Bool {
           mentions_in(call.children, name) {
           return true
         }
+      ChildrenExpression => ()
       Element(element) =>
         if mentions_in_attrs(element.attrs, name) ||
           mentions_in(element.children, name) {
@@ -377,6 +436,7 @@ fn Generator::write_node(
     HTMLComment(contents) =>
       self.w.write_literal(level, "<!--" + contents + "-->")
     Call(call) => self.write_call(call, level)
+    ChildrenExpression => self.write_children_expression(level)
     Element(element) => self.write_element(element, level)
     RawElement(raw) => self.write_raw_element(raw, level)
     Text(text) => self.w.write_literal(level, text)
@@ -412,6 +472,17 @@ fn Generator::write_call(
   )
   self.write_nodes(call.children, level + 1)
   self.w.write_indent(level, "})).render(ctx, w)\n")
+}
+
+///|
+/// `{ children... }` renders what the call this component answers handed over.
+/// The context is the one `write_children_preamble` cleared, so the children see
+/// their own context rather than this component's caller's.
+fn Generator::write_children_expression(
+  self : Generator,
+  level : Int32,
+) -> Unit {
+  self.w.write_indent(level, "children.render(ctx, w)\n")
 }
 
 ///|

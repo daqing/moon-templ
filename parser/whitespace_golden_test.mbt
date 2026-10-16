@@ -1326,3 +1326,40 @@ test "differential: whitespace around a component call" {
   assert_eq(preview("<p><div>a</div>\n@c()</p>"), "<p><div>a</div></p>")
   assert_eq(preview("<p>hello @c() world</p>"), "<p>hello  world</p>")
 }
+
+///|
+// A `{ children... }` renders like a call: templ emits no literal for it, so the
+// recording holds the literals around it. Unlike a call it takes no trailing
+// space either, which is what makes the run after one the caller's to keep or
+// drop — inside a call's block it survives, anywhere else it goes.
+test "differential: whitespace around a children expression" {
+  assert_eq(preview("<p>a { children... } b</p>"), "<p>a b</p>")
+  assert_eq(preview("<p>a\t{ children... }\tb</p>"), "<p>a\tb</p>")
+  assert_eq(preview("<p>a\n{ children... }\nb</p>"), "<p>ab</p>")
+  assert_eq(preview("<p>{ children... }</p>"), "<p></p>")
+  assert_eq(preview("<p>{children...}</p>"), "<p></p>")
+  assert_eq(preview("<p>{\nchildren...\n}</p>"), "<p></p>")
+  assert_eq(preview("<p>x{ children... }</p>"), "<p>x</p>")
+  assert_eq(preview("<p>{ children... }x</p>"), "<p>x</p>")
+  assert_eq(preview("<p>{ children... }\nx</p>"), "<p>x</p>")
+  assert_eq(preview("<p>{ x } { children... }</p>"), "<p>§</p>")
+  assert_eq(
+    preview("<p>a { children... } <div>x</div></p>"),
+    "<p>a <div>x</div></p>",
+  )
+  assert_eq(preview("<div>{ children... }</div>"), "<div></div>")
+  assert_eq(
+    preview("<div><p>a { children... } b</p></div>"),
+    "<div><p>a b</p></div>",
+  )
+  assert_eq(preview("{ children... } x"), "x")
+  assert_eq(preview("{ children... }\nx"), "x")
+  assert_eq(preview("@c() { a { children... } b }"), "a  b ")
+  assert_eq(preview("@c() { { children... } x }"), " x ")
+  assert_eq(preview("@c() { x { children... } }"), "x ")
+  assert_eq(preview("@c() { { children... } <div>x</div> }"), " <div>x</div>")
+  assert_eq(preview("@c() { { children... }\n<div>x</div> }"), " <div>x</div>")
+  assert_eq(preview("@c() { { children... } }"), "")
+  assert_eq(preview("@c() { a\n{ children... } }"), "a")
+  assert_eq(preview("@c() { <div>a</div> { children... } }"), "<div>a</div>")
+}

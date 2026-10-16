@@ -63,7 +63,9 @@ pub fn is_block_element(name : String) -> Bool {
 /// lands: what a branch writes is inline exactly when the branch is. A component
 /// call is not, even though it usually renders inline — nothing about the call
 /// says what it produces, so a space next to one is kept only by the rules that
-/// name calls outright.
+/// name calls outright. Neither is `{ children... }`, whose output the caller
+/// decides; templ hands the whitespace after one to the list it stands in rather
+/// than to the node, which is what `normalize_block_whitespace` reproduces.
 pub fn is_inline(node : Node) -> Bool {
   match node {
     Text(_) | StringExpression(_) => true
@@ -94,11 +96,31 @@ priv enum Piece {
 /// consuming the whitespace that trails a node, while leaving the run that
 /// precedes a tag inside the text itself.
 pub fn normalize_whitespace(nodes : Array[Node]) -> Array[Node] {
+  normalize(nodes, block=false)
+}
+
+///|
+/// Normalize the nodes of a block body: the children of a component call, and
+/// later the body of an `if` or a `for`.
+///
+/// templ keeps every whitespace node of an element's children or a template body
+/// but only the ones inside a block body, and the difference shows in the one
+/// place a whitespace node comes from: `{ children... }` does not take the run
+/// after it the way every other node does, so that run is a node of the list. In
+/// a block it is a space of its own — `@c() { { children... } x }` renders
+/// `" x"` — while in an element or a template body it is dropped, so
+/// `<p>{ children... } x</p>` renders `"x"`.
+pub fn normalize_block_whitespace(nodes : Array[Node]) -> Array[Node] {
+  normalize(nodes, block=true)
+}
+
+///|
+fn normalize(nodes : Array[Node], block~ : Bool) -> Array[Node] {
   let pieces : Array[Piece] = []
   for node in nodes {
     collect(node, pieces)
   }
-  emit(pieces)
+  emit(pieces, block~)
 }
 
 ///|
@@ -181,14 +203,14 @@ fn build(chars : Array[Char], from : Int32, to : Int32) -> String {
 }
 
 ///|
-fn emit(pieces : Array[Piece]) -> Array[Node] {
+fn emit(pieces : Array[Piece], block~ : Bool) -> Array[Node] {
   let out : Array[Node] = []
   for i, piece in pieces {
     match piece {
       Nested(node) => out.push(node)
       Literal(value) => out.push(Text(value))
       Gap(vertical~) =>
-        if keeps_gap(pieces, i, vertical) {
+        if keeps_gap(pieces, i, vertical, block~) {
           out.push(Text(" "))
         }
     }
@@ -204,12 +226,25 @@ fn emit(pieces : Array[Piece]) -> Array[Node] {
 /// follows it, and text keeps the whitespace when a self-closing call follows,
 /// but only for a run on the same line — a call written on the next line is
 /// laid out as a block and pulls no space after the text above it.
-fn keeps_gap(pieces : Array[Piece], at : Int32, vertical : Bool) -> Bool {
+///
+/// In a block body the run after a `{ children... }` is a node of the list
+/// rather than that expression's trailing space, and templ writes such a node as
+/// one space whatever stands next to it — a `<div>` included. A run at either
+/// end of the list is never one of those, which is what the guard below says.
+fn keeps_gap(
+  pieces : Array[Piece],
+  at : Int32,
+  vertical : Bool,
+  block~ : Bool,
+) -> Bool {
   if at == 0 || at + 1 >= pieces.length() {
     return false
   }
   let before = pieces[at - 1]
   let after = pieces[at + 1]
+  if block && is_children_piece(before) {
+    return true
+  }
   if is_inline_piece(before) && is_inline_piece(after) {
     return true
   }
@@ -250,6 +285,16 @@ fn is_text_piece(piece : Piece) -> Bool {
 fn is_self_closing_call(piece : Piece) -> Bool {
   match piece {
     Nested(Call(call)) => call.children.is_empty()
+    _ => false
+  }
+}
+
+///|
+/// A `{ children... }`. It is the one node that leaves the whitespace after it
+/// to the list, which only a block body does anything with.
+fn is_children_piece(piece : Piece) -> Bool {
+  match piece {
+    Nested(ChildrenExpression) => true
     _ => false
   }
 }

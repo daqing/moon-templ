@@ -12,6 +12,9 @@ pub(all) enum Node {
   RawElement(RawElement)
   Text(String)
   StringExpression(String)
+  /// `{ children... }`, where the component that was called renders what its
+  /// caller handed it.
+  ChildrenExpression
 } derive(Debug, Eq)
 
 ///|

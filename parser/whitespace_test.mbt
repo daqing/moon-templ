@@ -34,6 +34,7 @@ fn preview_nodes(nodes : Array[@parser.Node], buf : StringBuilder) -> Unit {
       Text(s) => buf.write_string(s)
       StringExpression(_) => buf.write_string("§")
       Call(call) => preview_nodes(call.children, buf)
+      ChildrenExpression => ()
       Element(e) => {
         buf.write_string("<" + e.name + ">")
         preview_nodes(e.children, buf)

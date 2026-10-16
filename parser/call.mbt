@@ -47,7 +47,7 @@ fn parse_call_children(
         offset~,
         message="@" + expression + ": missing end (expected '}')",
       )
-    _ => (normalize_whitespace(nodes), drop_prefix(at_close, "}"[:]))
+    _ => (normalize_block_whitespace(nodes), drop_prefix(at_close, "}"[:]))
   }
 }
 

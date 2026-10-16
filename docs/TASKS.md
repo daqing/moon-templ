@@ -4,7 +4,7 @@
 拆分日期:2026-10-17
 目标:把 `a-h/templ` 的模板引擎在 MoonBit 中重新实现
 
-**进度:31 / 58**
+**进度:32 / 58**
 
 ---
 
@@ -18,7 +18,7 @@
   | T0 决策与准备 | 5 | 5 | 0 |
   | T1 runtime 地基 | 5 | 5 | 0 |
   | T2 parser + generator 骨架 | 19 | 19 | 0 |
-  | T3 MVP 完整 | 11 | 2 | 0 |
+  | T3 MVP 完整 | 11 | 3 | 0 |
   | T4 属性特殊语义 | 8 | 0 | 0 |
   | T5 工具链与打磨 | 5 | 0 | 1(T5.2) |
   | T6 可选 / 远期 | 5 | 0 | 3 |
@@ -131,7 +131,7 @@
 
 - [x] **T3.1** 表达式属性 `name={ expr }` — 生成 `resolve_attribute_value` 调用;快照测试 · 前置 T2.4、T2.15 · M
 - [x] **T3.2** 组件调用 `@expr` / `@expr { }` — 生成 `.with_children(...).render(...)`;校验 `@` 前必须有空白 · 前置 T3.1 · M
-- [ ] **T3.3** `{ children... }` + children 前导的三级发射规则 — 按 port-research §3.2 的表分级发射(避免 `unused_value`);单测验证 children **不透传**到孙子组件 · 前置 T3.2 · M
+- [x] **T3.3** `{ children... }` + children 前导的三级发射规则 — 按 port-research §3.2 的表分级发射(避免 `unused_value`);单测验证 children **不透传**到孙子组件 · 前置 T3.2 · M
 - [ ] **T3.4** `if` / `else if` / `else` — 条件原文抄进产物交给 MoonBit 编译器校验;校验 `{` 后必须换行 · 前置 T2.15 · M
 - [ ] **T3.5** `for`:C 风格与 `for..in` 两种形式 — 两种形式各有快照;注意 MoonBit C 风格 for 写 `i = i + 1` · 前置 T3.4 · M
 - [ ] **T3.6** 控制流分支:`match`(T0.1 已定,不用 Go 风格 `switch`)— 快照测试;需支持解构模式 `Some(x) => { ... }` · 前置 T3.5 · M

@@ -82,11 +82,18 @@ fn parse_nodes_into(
       out.push(node)
       parse_nodes_into(rest, offset + consumed(src, rest), stop, out)
     }
-    ['{', .. rest] => {
-      let (expr, after) = scan_expression(rest, offset)
-      out.push(StringExpression(expr))
-      parse_nodes_into(after, offset + consumed(src, after), stop, out)
-    }
+    ['{', .. rest] =>
+      match match_children_expression(src) {
+        Some(after) => {
+          out.push(ChildrenExpression)
+          parse_nodes_into(after, offset + consumed(src, after), stop, out)
+        }
+        None => {
+          let (expr, after) = scan_expression(rest, offset)
+          out.push(StringExpression(expr))
+          parse_nodes_into(after, offset + consumed(src, after), stop, out)
+        }
+      }
     _ => {
       let buf = StringBuilder()
       let rest = if is_space_run_before_at(src) {
