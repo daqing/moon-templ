@@ -149,6 +149,7 @@ fn reads_ctx(nodes : Array[@parser.Node]) -> Bool {
     match node {
       Call(_) | ChildrenExpression => return true
       If(expr) => if any_if_body(expr, reads_ctx) { return true }
+      For(expr) => if reads_ctx(expr.children) { return true }
       Element(element) => if reads_ctx(element.children) { return true }
       Text(_)
       | StringExpression(_)
@@ -173,6 +174,7 @@ fn renders_children(nodes : Array[@parser.Node]) -> Bool {
       ChildrenExpression => return true
       Call(call) => if renders_children(call.children) { return true }
       If(expr) => if any_if_body(expr, renders_children) { return true }
+      For(expr) => if renders_children(expr.children) { return true }
       Element(element) => if renders_children(element.children) { return true }
       Text(_)
       | StringExpression(_)
@@ -251,6 +253,7 @@ fn emits_output(nodes : Array[@parser.Node]) -> Bool {
       StringExpression(expr) => if !expr.trim().is_empty() { return true }
       Text(text) => if !text.is_empty() { return true }
       If(expr) => if any_if_body(expr, emits_output) { return true }
+      For(expr) => if emits_output(expr.children) { return true }
       Call(_)
       | ChildrenExpression
       | Element(_)
@@ -362,6 +365,13 @@ fn mentions_in(nodes : Array[@parser.Node], name : String) -> Bool {
           any_if_body(expr, fn(nodes) { mentions_in(nodes, name) }) {
           return true
         }
+      For(expr) =>
+        // A loop head names the very variables its body reads, and it is copied
+        // into the generated file, so a parameter read only there is still used.
+        if mentions(expr.expression[:], name[:], None) ||
+          mentions_in(expr.children, name) {
+          return true
+        }
       ChildrenExpression => ()
       Element(element) =>
         if mentions_in_attrs(element.attrs, name) ||
@@ -447,6 +457,7 @@ fn Generator::write_node(
       self.w.write_literal(level, "<!--" + contents + "-->")
     Call(call) => self.write_call(call, level)
     If(expr) => self.write_if(expr, level)
+    For(expr) => self.write_for(expr, level)
     ChildrenExpression => self.write_children_expression(level)
     Element(element) => self.write_element(element, level)
     RawElement(raw) => self.write_raw_element(raw, level)
@@ -521,6 +532,21 @@ fn Generator::write_if(
     self.w.write_indent(level, "} else {\n")
     self.write_nodes(expr.else_, level + 1)
   }
+  self.w.write_indent(level, "}\n")
+}
+
+///|
+/// A `for` and its body, written as the same statement in MoonBit. The head is
+/// template source copied through as it stands, whichever of the two forms it
+/// takes: what a loop may step over is a MoonBit expression, so the compiler that
+/// reads the generated file is the one that checks it.
+fn Generator::write_for(
+  self : Generator,
+  expr : @parser.ForExpression,
+  level : Int32,
+) -> Unit raise GenerateError {
+  self.w.write_indent(level, "for " + expr.expression + " {\n")
+  self.write_nodes(expr.children, level + 1)
   self.w.write_indent(level, "}\n")
 }
 

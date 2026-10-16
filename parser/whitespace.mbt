@@ -70,7 +70,7 @@ pub fn is_block_element(name : String) -> Bool {
 /// node, which is what `normalize_block_whitespace` reproduces.
 pub fn is_inline(node : Node) -> Bool {
   match node {
-    Text(_) | StringExpression(_) | If(_) => true
+    Text(_) | StringExpression(_) | If(_) | For(_) => true
     Element(e) => !is_block_element(e.name)
     _ => false
   }
@@ -102,14 +102,14 @@ pub fn normalize_whitespace(nodes : Array[Node]) -> Array[Node] {
 }
 
 ///|
-/// Normalize the nodes of a block body: the children of a component call, and the
-/// branches of an `if`.
+/// Normalize the nodes of a block body: the children of a component call, the
+/// branches of an `if`, and the body of a `for`.
 ///
 /// templ keeps every whitespace node of an element's children or a template body
 /// but only the ones inside a block body, and the difference shows in the one
-/// place a whitespace node comes from: `{ children... }` and an `if` do not take
-/// the run after them the way every other node does, so that run is a node of the
-/// list. In a block it is a space of its own — `@c() { { children... } x }`
+/// place a whitespace node comes from: `{ children... }`, an `if` and a `for` do
+/// not take the run after them the way every other node does, so that run is a
+/// node of the list. In a block it is a space of its own — `@c() { { children... } x }`
 /// renders `" x"` — while in an element or a template body it is dropped, so
 /// `<p>{ children... } x</p>` renders `"x"`.
 pub fn normalize_block_whitespace(nodes : Array[Node]) -> Array[Node] {
@@ -314,8 +314,8 @@ fn piece_after(
 }
 
 ///|
-/// Normalize the bodies that need the list around them, which is what an `if` is:
-/// its branches end where the statement's next sibling begins, so the last node
+/// Normalize the bodies that need the list around them, which is what a statement
+/// is: its bodies end where the statement's next sibling begins, so the last node
 /// of each of them decides its trailing space against that sibling rather than
 /// against nothing. templ hands `writeNodes` the very `next` node it was given
 /// for the statement, and `piece_after` works out the same node here.
@@ -326,15 +326,24 @@ fn resolve_bodies(
 ) -> Array[Piece] {
   let out : Array[Piece] = []
   for i, piece in pieces {
+    let next = piece_after(pieces, i, block~, after~)
     match piece {
-      Nested(If(expr)) =>
-        out.push(
-          Nested(If(normalize_if(expr, piece_after(pieces, i, block~, after~)))),
-        )
+      Nested(If(expr)) => out.push(Nested(If(normalize_if(expr, next))))
+      Nested(For(expr)) => out.push(Nested(For(normalize_for(expr, next))))
       _ => out.push(piece)
     }
   }
   out
+}
+
+///|
+/// The body of a `for` is a block body written to the statement's next sibling,
+/// `after`.
+fn normalize_for(expr : ForExpression, after : Piece?) -> ForExpression {
+  {
+    expression: expr.expression,
+    children: normalize(expr.children, block=true, after~),
+  }
 }
 
 ///|
@@ -391,11 +400,11 @@ fn is_self_closing_call(piece : Piece) -> Bool {
 /// Whether the whitespace that follows this node belongs to the list it stands in
 /// rather than to the node. templ gives the run after a node to the node itself
 /// where the node can hold one — text, an element, an expression, a call — and
-/// leaves it to the list where it cannot: an `if`, and a `{ children... }` whose
-/// output the caller decides.
+/// leaves it to the list where it cannot: a statement, whose block ends at its
+/// closing brace, and a `{ children... }` whose output the caller decides.
 fn leaves_trailing_space_to_list(piece : Piece) -> Bool {
   match piece {
-    Nested(If(_)) => true
+    Nested(If(_)) | Nested(For(_)) => true
     Nested(ChildrenExpression) => true
     _ => false
   }

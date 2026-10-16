@@ -29,8 +29,9 @@ fn is_void(name : String) -> Bool {
 /// children's literals land where the call stands. Printing the children and
 /// nothing else lines the two recordings up.
 ///
-/// An `if` prints every branch, in templ's own order: templ emits the literals of
-/// all of them, since only one of them runs.
+/// A statement prints every body it holds, in templ's own order: templ emits the
+/// literals of all of them, since only one branch of an `if` runs, and a `for`
+/// body is emitted once and runs as many times as the loop asks.
 fn preview_nodes(nodes : Array[@parser.Node], buf : StringBuilder) -> Unit {
   for node in nodes {
     match node {
@@ -59,6 +60,7 @@ fn preview_nodes(nodes : Array[@parser.Node], buf : StringBuilder) -> Unit {
         }
         preview_nodes(expr.else_, buf)
       }
+      For(expr) => preview_nodes(expr.children, buf)
     }
   }
 }

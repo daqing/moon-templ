@@ -72,6 +72,14 @@ pub fn ElseIf::equal(Self, Self) -> Bool
 pub fn ElseIf::not_equal(Self, Self) -> Bool
 pub fn ElseIf::to_repr(Self) -> @debug.Repr
 
+pub(all) struct ForExpression {
+  expression : String
+  children : Array[Node]
+} derive(Eq, @debug.Debug)
+pub fn ForExpression::equal(Self, Self) -> Bool
+pub fn ForExpression::not_equal(Self, Self) -> Bool
+pub fn ForExpression::to_repr(Self) -> @debug.Repr
+
 pub(all) struct IfExpression {
   condition : String
   then : Array[Node]
@@ -87,6 +95,7 @@ pub(all) enum Node {
   HTMLComment(String)
   Call(Call)
   If(IfExpression)
+  For(ForExpression)
   Element(Element)
   RawElement(RawElement)
   Text(String)

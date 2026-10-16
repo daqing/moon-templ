@@ -94,8 +94,8 @@ fn parse_nodes_into(
           parse_nodes_into(after, offset + consumed(src, after), stop, out)
         }
       }
-    _ if src.has_prefix("if "[:]) => {
-      let (node, rest) = parse_if(src, offset)
+    _ if starts_statement(src) => {
+      let (node, rest) = parse_statement(src, offset)
       out.push(node)
       parse_nodes_into(rest, offset + consumed(src, rest), stop, out)
     }
@@ -118,8 +118,8 @@ fn parse_nodes_into(
 ///
 /// templ gives the whitespace that trails a node to that node, so a node the
 /// whitespace does not belong to begins at its first character — which is what
-/// makes `@` start a call and `if ` a statement even in the middle of a line, as
-/// long as a node ends before them. Read on its own, the run stays a gap that
+/// makes `@` start a call and `if` or `for` a statement even in the middle of a
+/// line, as long as a node ends before them. Read on its own, the run stays a gap that
 /// collapses, rather than the spaces of a line of text that survive verbatim; a
 /// node list that starts with the run has nobody before it to take that
 /// whitespace, which is why the run has to be read rather than left to end the
@@ -215,10 +215,24 @@ fn take_text(
 ///|
 /// Whether a node list starts here with a statement rather than with text. templ
 /// guesses from the keyword alone and errors when what follows is not one, which
-/// is why `if you like` opening a line is a parse error rather than a sentence —
-/// the escape is to put the word in an expression, `{ "if" }`.
+/// is why `if you like`, or `for the best`, opening a line is a parse error
+/// rather than a sentence — the escape is to put the word in an expression,
+/// `{ "if" }`.
 fn starts_statement(src : StringView) -> Bool {
-  src.has_prefix("if "[:])
+  src.has_prefix("if "[:]) || src.has_prefix("for "[:])
+}
+
+///|
+/// Parse the statement a node list starts with here.
+fn parse_statement(
+  src : StringView,
+  offset : Int32,
+) -> (Node, StringView) raise ParseError {
+  if src.has_prefix("if "[:]) {
+    parse_if(src, offset)
+  } else {
+    parse_for(src, offset)
+  }
 }
 
 ///|

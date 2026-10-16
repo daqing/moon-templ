@@ -14,7 +14,12 @@ fn parse_if(
   offset : Int32,
 ) -> (Node, StringView) raise ParseError {
   let after_if = drop_prefix(src, "if "[:])
-  let (condition, after_open) = open_block(after_if, offset)
+  let (condition, after_open) = open_block(
+    after_if,
+    offset,
+    keyword="if",
+    what="condition",
+  )
   let (then_nodes, at_close) = parse_nodes(
     after_open,
     offset + consumed(src, after_open),
@@ -25,44 +30,6 @@ fn parse_if(
     offset + consumed(src, at_close),
   )
   (If({ condition, then: then_nodes, else_ifs, else_: else_nodes, }), rest)
-}
-
-///|
-/// Read the head of a branch: its condition, the `{` that opens the block, and
-/// the newline that has to follow that brace.
-///
-/// Spaces and tabs may pad the brace, and it is free to stand on the line after
-/// the condition — templ reads the condition with a Go parser that does not care
-/// where the line ends, so a long condition may be wrapped. What it may not do is
-/// share a line with the first thing in the block.
-fn open_block(
-  src : StringView,
-  offset : Int32,
-) -> (String, StringView) raise ParseError {
-  let buf = StringBuilder()
-  let at_brace = match scan_condition(src, 0, buf) {
-    Some(rest) => rest
-    None =>
-      raise ParseError(offset~, message="if: missing '{' after the condition")
-  }
-  let condition = trim_space(buf.to_string())
-  if condition.is_empty() {
-    raise ParseError(offset~, message="if: expected a condition before '{'")
-  }
-  let after_brace = match take_spaces(at_brace) {
-    ['{', .. rest] => take_spaces(rest)
-    _ =>
-      raise ParseError(offset~, message="if: expected '{' after the condition")
-  }
-  match after_brace {
-    ['\n', .. rest] => (condition, rest)
-    ['\r', '\n', .. rest] => (condition, rest)
-    _ =>
-      raise ParseError(
-        offset~,
-        message="if: expected a newline after '{', so that the block starts on a line of its own",
-      )
-  }
 }
 
 ///|
@@ -88,7 +55,7 @@ fn parse_else_ifs(
   offset : Int32,
   collected : Array[ElseIf],
 ) -> (Array[ElseIf], Array[Node], StringView) raise ParseError {
-  let after_brace = close_brace(at_close, offset)
+  let after_brace = close_brace(at_close, offset, keyword="if")
   let after_space = skip_space(after_brace)
   let at = offset + consumed(at_close, after_space)
   if after_space.has_prefix("else if"[:]) {
@@ -97,6 +64,8 @@ fn parse_else_ifs(
     let (condition, after_open) = open_block(
       drop_prefix(after_space, "else if"[:]),
       at,
+      keyword="if",
+      what="condition",
     )
     let body_at = at + consumed(after_space, after_open)
     let (nodes, close) = parse_nodes(after_open, body_at, at_close_brace)
@@ -111,7 +80,7 @@ fn parse_else_ifs(
     Some(body) => {
       let body_at = at + consumed(after_space, body)
       let (nodes, close) = parse_nodes(body, body_at, at_close_brace)
-      (collected, nodes, close_brace(close, body_at))
+      (collected, nodes, close_brace(close, body_at, keyword="if"))
     }
     None => (collected, [], after_brace)
   }
@@ -129,25 +98,5 @@ fn take_else(src : StringView) -> StringView? {
         _ => None
       }
     _ => None
-  }
-}
-
-///|
-/// Whether `src` stands at the `}` that closes a block, which may be padded with
-/// spaces or tabs.
-fn at_close_brace(src : StringView) -> Bool {
-  match take_spaces(src) {
-    ['}', ..] => true
-    _ => false
-  }
-}
-
-///|
-/// Consume the `}` that closes a block, padded or not.
-fn close_brace(src : StringView, offset : Int32) -> StringView raise ParseError {
-  match take_spaces(src) {
-    ['}', .. rest] => rest
-    _ =>
-      raise ParseError(offset~, message="if: expected '}' to close the block")
   }
 }

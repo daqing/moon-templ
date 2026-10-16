@@ -1488,3 +1488,87 @@ test "differential: whitespace around an if statement" {
     "a <i>c</i> <i>d</i> <i>e</i> b",
   )
 }
+
+///|
+// Generated from templ v0.3.1070 by the differential probe: each
+// expected string is the concatenation of the string literals templ's own
+// generator emits for that template body, with `§` standing in for the value
+// of an expression. The loop heads below are spelled the way MoonBit spells
+// them; the probe was given templ's own Go spelling of the same head, which
+// is what the whitespace rules around it depend on.
+test "differential: whitespace around a for statement" {
+  assert_eq(preview("for i, v in items {\n<i>c</i>\n}"), "<i>c</i>")
+  assert_eq(preview("for i, v in items {\n<i>c</i>\n}x"), "<i>c</i> x")
+  assert_eq(
+    preview("<p>a</p>\nfor i, v in items {\n<i>c</i>\n}"),
+    "<p>a</p><i>c</i>",
+  )
+  assert_eq(
+    preview("<p>for i, v in items {\n<i>c</i>\n}</p>"),
+    "<p><i>c</i></p>",
+  )
+  assert_eq(
+    preview("<div>\nfor i, v in items {\n<i>c</i>\n}\n</div>"),
+    "<div><i>c</i></div>",
+  )
+  assert_eq(preview("a\nfor i, v in items {\n<i>c</i>\n}\nb"), "a <i>c</i> b")
+  assert_eq(preview("<i>a</i> for i, v in items {\nb\n}"), "<i>a</i> b")
+  assert_eq(
+    preview("<span>a</span> for i, v in items {\n<i>c</i>\n}"),
+    "<span>a</span> <i>c</i>",
+  )
+  assert_eq(
+    preview("for i, v in items {\nfor j, w in items {\n<i>c</i>\n}\n}"),
+    "<i>c</i>",
+  )
+  assert_eq(preview("@c() {\nfor i, v in items {\n<i>c</i>\n}\n}"), "<i>c</i>")
+  assert_eq(
+    preview("for i, v in items {\n<i>c</i>\n}\n<i>d</i>"),
+    "<i>c</i> <i>d</i>",
+  )
+  assert_eq(preview("for i = 0; i < 3; i = i + 1 {\n<i>c</i>\n}"), "<i>c</i>")
+  assert_eq(
+    preview("for i = 0; i < 3; i = i + 1 {\n<i>c</i>\n}\n<i>d</i>"),
+    "<i>c</i> <i>d</i>",
+  )
+  assert_eq(preview("for i, v in items {\n<i>c</i>\n} \n"), "<i>c</i>")
+  assert_eq(preview("for i, v in items {\n  <i>c</i>\n}"), "<i>c</i>")
+  assert_eq(preview("for i, v in items {\n\t<i>c</i>\n}"), "<i>c</i>")
+  assert_eq(preview("for i, v in items {\n <i>c</i> \n}"), "<i>c</i>")
+  assert_eq(preview("for i, v in items {\n}"), "")
+  assert_eq(preview("for x {\n<i>c</i>\n}"), "<i>c</i>")
+  assert_eq(preview("\nfor i, v in items {\n<i>c</i>\n}"), "<i>c</i>")
+  assert_eq(
+    preview("<p>\nfor i, v in items {\n<i>c</i>\n}\n</p>"),
+    "<p><i>c</i></p>",
+  )
+  assert_eq(
+    preview("<div>a\nfor i, v in items {\n<i>c</i>\n}\nb</div>"),
+    "<div>a <i>c</i> b</div>",
+  )
+  assert_eq(
+    preview(
+      "for i, v in items {\n<p>a</p>\nfor j, w in items {\n<i>d</i>\n}\n}",
+    ),
+    "<p>a</p><i>d</i>",
+  )
+  assert_eq(preview("for i, v in items {\n@c() {\n{ children... }\n}\n}"), "")
+  assert_eq(
+    preview("@shell() {\nfor i, v in items {\n<i>c</i>\n}\n}"),
+    "<i>c</i>",
+  )
+  assert_eq(
+    preview("for i, v in items {\n<i>c</i>\n}\n<p>b</p>"),
+    "<i>c</i><p>b</p>",
+  )
+  assert_eq(
+    preview("<p>b</p>\nfor i, v in items {\n<i>c</i>\n}"),
+    "<p>b</p><i>c</i>",
+  )
+  assert_eq(
+    preview(
+      "for i, v in items {\n<i>c</i>\n}\nfor j, w in items {\n<i>d</i>\n}",
+    ),
+    "<i>c</i> <i>d</i>",
+  )
+}

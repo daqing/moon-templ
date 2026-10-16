@@ -10,6 +10,8 @@ pub(all) enum Node {
   Call(Call)
   /// `if cond { ... }` with its `else if` chain and its `else`.
   If(IfExpression)
+  /// `for head { ... }`, in either of the two forms MoonBit writes.
+  For(ForExpression)
   Element(Element)
   RawElement(RawElement)
   Text(String)
@@ -49,6 +51,17 @@ pub(all) struct IfExpression {
 pub(all) struct ElseIf {
   condition : String
   then : Array[Node]
+} derive(Debug, Eq)
+
+///|
+/// `for head { ... }`, in either of the two forms MoonBit writes: the C-style
+/// `for i = 0; i < n; i = i + 1`, and `for v in items` — templ's range form,
+/// which its own syntax would spell `for i, v := range items`. Both are what the
+/// generated file holds, so an index may stand beside the value, and the head is
+/// copied through as it stands for the compiler to check.
+pub(all) struct ForExpression {
+  expression : String
+  children : Array[Node]
 } derive(Debug, Eq)
 
 ///|
@@ -117,6 +130,12 @@ pub extend ElseIf with Eq::{equal, not_equal}
 
 ///|
 pub extend ElseIf with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend ForExpression with Eq::{equal, not_equal}
+
+///|
+pub extend ForExpression with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
 pub extend Element with Eq::{equal, not_equal}
