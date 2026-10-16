@@ -68,6 +68,12 @@ pub fn is_block_element(name : String) -> Bool {
 /// outright. Neither is `{ children... }`, whose output the caller decides; templ
 /// hands the whitespace after one to the list it stands in rather than to the
 /// node, which is what `normalize_block_whitespace` reproduces.
+///
+/// A `{{ code }}` block is not inline either. Nothing about it says what it
+/// writes, and templ reads the run that follows one into the block itself, so
+/// there is no whitespace of its own left to weigh: `a{{ x := 1 }} c` renders
+/// `"ac"` while `a {{ x := 1 }} c` renders `"a c"`, the second space being part
+/// of the text before the block.
 pub fn is_inline(node : Node) -> Bool {
   match node {
     Text(_) | StringExpression(_) | If(_) | For(_) | Match(_) => true

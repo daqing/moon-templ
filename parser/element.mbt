@@ -82,6 +82,11 @@ fn parse_nodes_into(
       out.push(node)
       parse_nodes_into(rest, offset + consumed(src, rest), stop, out)
     }
+    ['{', '{', ..] => {
+      let (node, rest) = parse_go_code(src, offset)
+      out.push(node)
+      parse_nodes_into(rest, offset + consumed(src, rest), stop, out)
+    }
     ['{', .. rest] =>
       match match_children_expression(src) {
         Some(after) => {

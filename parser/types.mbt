@@ -14,6 +14,8 @@ pub(all) enum Node {
   For(ForExpression)
   /// `match subject { pattern => { ... } }`.
   Match(MatchExpression)
+  /// `{{ code }}`, written into the generated function body as it stands.
+  GoCode(String)
   Element(Element)
   RawElement(RawElement)
   Text(String)

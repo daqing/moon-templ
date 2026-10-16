@@ -156,7 +156,8 @@ fn reads_ctx(nodes : Array[@parser.Node]) -> Bool {
       | StringExpression(_)
       | RawElement(_)
       | HTMLComment(_)
-      | DocType(_) => ()
+      | DocType(_)
+      | GoCode(_) => ()
     }
   }
   false
@@ -182,7 +183,8 @@ fn renders_children(nodes : Array[@parser.Node]) -> Bool {
       | StringExpression(_)
       | RawElement(_)
       | HTMLComment(_)
-      | DocType(_) => ()
+      | DocType(_)
+      | GoCode(_) => ()
     }
   }
   false
@@ -263,6 +265,9 @@ fn emits_output(nodes : Array[@parser.Node]) -> Bool {
       | RawElement(_)
       | HTMLComment(_)
       | DocType(_) => return true
+      // A `{{ code }}` block writes whatever the code writes, which nothing here
+      // can read; being code, it is not text either.
+      GoCode(_) => ()
     }
   }
   false
@@ -376,6 +381,7 @@ fn mentions_in(nodes : Array[@parser.Node], name : String) -> Bool {
           return true
         }
       Match(expr) => if match_mentions(expr, name) { return true }
+      GoCode(code) => if mentions(code[:], name[:], None) { return true }
       ChildrenExpression => ()
       Element(element) =>
         if mentions_in_attrs(element.attrs, name) ||
@@ -481,6 +487,7 @@ fn Generator::write_node(
     If(expr) => self.write_if(expr, level)
     For(expr) => self.write_for(expr, level)
     Match(expr) => self.write_match(expr, level)
+    GoCode(code) => self.write_go_code(code, level)
     ChildrenExpression => self.write_children_expression(level)
     Element(element) => self.write_element(element, level)
     RawElement(raw) => self.write_raw_element(raw, level)
@@ -662,6 +669,28 @@ fn Generator::write_expression(
     )
   }
   self.w.write_indent(level, "@rt.write_any(w, " + value + ")\n")
+}
+
+///|
+/// `{{ code }}` is code: it is written into the body as it stands, at the indent
+/// its node stands at, and the compiler that reads the generated file is the one
+/// that checks it. Nothing is written for a block that holds only whitespace —
+/// templ writes nothing for one either, and a blank line would be all it could
+/// leave behind.
+///
+/// Unlike every other node, the block does not hand the markup around it to the
+/// literal buffer, so a `{{ ... }}` between two pieces of text splits what would
+/// have been one `w.write_string` call into two.
+fn Generator::write_go_code(
+  self : Generator,
+  code : String,
+  level : Int32,
+) -> Unit {
+  let value = code.trim().to_owned()
+  if value.is_empty() {
+    return
+  }
+  self.w.write_indent(level, value + "\n")
 }
 
 ///|

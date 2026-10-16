@@ -65,6 +65,7 @@ fn preview_nodes(nodes : Array[@parser.Node], buf : StringBuilder) -> Unit {
         for arm in expr.arms {
           preview_nodes(arm.children, buf)
         }
+      GoCode(_) => ()
     }
   }
 }

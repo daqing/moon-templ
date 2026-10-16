@@ -114,6 +114,7 @@ pub(all) enum Node {
   If(IfExpression)
   For(ForExpression)
   Match(MatchExpression)
+  GoCode(String)
   Element(Element)
   RawElement(RawElement)
   Text(String)

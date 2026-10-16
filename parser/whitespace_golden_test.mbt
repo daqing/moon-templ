@@ -1731,3 +1731,64 @@ test "differential: whitespace around a match statement" {
     "<i>c</i> <i>d</i> <i>e</i>",
   )
 }
+
+///|
+// Generated from templ v0.3.1070 by the differential probe: each
+// expected string is the concatenation of the string literals templ's own
+// generator emits for that template body. A `{{ code }}` block is written the
+// same way on both sides, so the inputs are spelled once here.
+test "differential: whitespace around a go code block" {
+  assert_eq(preview("{{ x := 1 }}"), "")
+  assert_eq(preview("{{x := 1}}"), "")
+  assert_eq(preview("a{{ x := 1 }}"), "a")
+  assert_eq(preview("a{{ x := 1 }}b"), "ab")
+  assert_eq(preview("a {{ x := 1 }} b"), "a b")
+  assert_eq(preview("a {{ x := 1 }}b"), "a b")
+  assert_eq(preview("a\n{{ x := 1 }}\nb"), "ab")
+  assert_eq(preview("<p>a</p>{{ x := 1 }}"), "<p>a</p>")
+  assert_eq(preview("<p>a</p> {{ x := 1 }}"), "<p>a</p>")
+  assert_eq(preview("<p>a</p>{{ x := 1 }} b"), "<p>a</p>b")
+  assert_eq(preview("<p>a</p> {{ x := 1 }} b"), "<p>a</p>b")
+  assert_eq(preview("{{ x := 1 }}<p>a</p>"), "<p>a</p>")
+  assert_eq(preview("{{ x := 1 }}\n<p>a</p>"), "<p>a</p>")
+  assert_eq(preview("<p>a</p>\n{{ x := 1 }}"), "<p>a</p>")
+  assert_eq(preview("<div>\n{{ x := 1 }}\n</div>"), "<div></div>")
+  assert_eq(
+    preview("<div>\n  <p>a</p>\n  {{ x := 1 }}\n  <p>b</p>\n</div>"),
+    "<div><p>a</p><p>b</p></div>",
+  )
+  assert_eq(
+    preview("<div>{{ x := 1 }}<span>a</span></div>"),
+    "<div><span>a</span></div>",
+  )
+  assert_eq(
+    preview("<span>a</span>{{ x := 1 }}<span>b</span>"),
+    "<span>a</span><span>b</span>",
+  )
+  assert_eq(
+    preview("<span>a</span> {{ x := 1 }} <span>b</span>"),
+    "<span>a</span><span>b</span>",
+  )
+  assert_eq(
+    preview("<span>a</span>\n{{ x := 1 }}\n<span>b</span>"),
+    "<span>a</span><span>b</span>",
+  )
+  assert_eq(preview("if x == \"a\" {\n{{ y := 1 }}\n<i>c</i>\n}"), "<i>c</i>")
+  assert_eq(preview("if x == \"a\" {\n<i>c</i>\n}\n{{ y := 1 }}"), "<i>c</i>")
+  assert_eq(
+    preview(
+      "if x == \"a\" {\n{{ y := 1 }}\n<i>c</i>\n} else {\n{{ y := 2 }}\n<i>d</i>\n}",
+    ),
+    "<i>c</i><i>d</i>",
+  )
+  assert_eq(preview("{{ z := 1 }}\n{{ y := 2 }}"), "")
+  assert_eq(preview("{{ z := 1 }} {{ y := 2 }}"), "")
+  assert_eq(
+    preview("{{ z := 1 }}\n<i>c</i>\n{{ y := 2 }}\n<i>d</i>"),
+    "<i>c</i><i>d</i>",
+  )
+  assert_eq(
+    preview("<i>c</i>\n{{ z := 1 }}\n<i>d</i>\n{{ y := 2 }}\n<i>e</i>"),
+    "<i>c</i><i>d</i><i>e</i>",
+  )
+}
