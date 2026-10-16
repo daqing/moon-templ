@@ -36,7 +36,7 @@ fn preview_nodes(nodes : Array[@parser.Node], buf : StringBuilder) -> Unit {
         }
       }
       HTMLComment(_) => buf.write_string("<!---->")
-      DocType => buf.write_string("<!doctype html>")
+      DocType(v) => buf.write_string("<!doctype " + v + ">")
       RawElement(e) => {
         buf.write_string("<" + e.name + ">")
         buf.write_string(e.contents)

@@ -4,7 +4,7 @@
 拆分日期:2026-10-17
 目标:把 `a-h/templ` 的模板引擎在 MoonBit 中重新实现
 
-**进度:26 / 57**
+**进度:27 / 58**
 
 ---
 
@@ -17,7 +17,7 @@
   |---|---|---|---|
   | T0 决策与准备 | 5 | 5 | 0 |
   | T1 runtime 地基 | 5 | 5 | 0 |
-  | T2 parser + generator 骨架 | 18 | 16 | 0 |
+  | T2 parser + generator 骨架 | 19 | 17 | 0 |
   | T3 MVP 完整 | 11 | 0 | 0 |
   | T4 属性特殊语义 | 8 | 0 | 0 |
   | T5 工具链与打磨 | 5 | 0 | 1(T5.2) |
@@ -104,7 +104,14 @@
   - **`unused_value` 定案**:未使用的参数与接收者在闭包体开头 `ignore(x)` —— 签名由模板作者决定,不能因为体里没读就删,`ignore` 保住调用点的具名写法;`ignore` 一个其实被用到的名字零代价,所以判不准时一律算"被用到",最坏是多一条警告而不会让体坏掉。`~name` 这类带标签(以及任何非平凡标识符)的参数**跳过不动**:调用点怎么拼是调用者的事,生成器不能替他改。体不产生任何输出时,写游标参数直接叫 `_w` 而不是 `w` + `ignore(w)`(空体的产物因此更短:一次 `@rt.component(fn(_ctx, _w) {  })`)。
   - "体里有没有读这个参数"的判据是**只在 `StringExpression` 里搜**(元素递归下去),文本节点不算 —— `<p>name</p>` 里的 `name` 是给用户看的字,不是读参数。匹配按**整词**边界(`mentions`),否则参数 `a` 会被 `ab` 误判成已用。
   - 结果:三个原先各带一条 `unused_value` 警告的模板全部无警告;generator 包 57 个测试、全模块 154 个测试通过。
-- [ ] **T2.17** 解析 `<!doctype html>` 与 `<!-- ... -->`(parser 侧)— T2.11 已经能**发射**这两类节点,但 parser 一个都产生不出来,现在只能从手搭 AST 测;不加这段,真实页面里的 doctype 会直接报"element name must start with a lowercase letter: !"。同时给 T2.11 的 `HTMLComment` 内容定案:templ 的 `Contents` **不含** `<!--`/`-->`,只有中间那段 · 前置 T2.4 · S
+- [x] **T2.17** 解析 `<!doctype html>` 与 `<!-- ... -->`(parser 侧)— T2.11 已经能**发射**这两类节点,但 parser 一个都产生不出来,现在只能从手搭 AST 测;不加这段,真实页面里的 doctype 会直接报"element name must start with a lowercase letter: !"。同时给 T2.11 的 `HTMLComment` 内容定案:templ 的 `Contents` **不含** `<!--`/`-->`,只有中间那段 · 前置 T2.4 · S
+  - 新增 `parser/declaration.mbt`,并在 `element.mbt` 里把 `['<', ..]` 这一支提成 `parse_tag`:注释 → doctype → raw element → 普通元素。这两类必须排在 `parse_element` **之前**,否则 `<!` 会先撞上"element name must start with a lowercase letter: !"。
+  - doctype 关键字**大小写不敏感**(对齐 templ 的 `parse.StringInsensitive("<!doctype ")`),但**必须带那个分隔空格** —— `<!doctypehtml>` 不是 doctype,仍按元素名报错(有测试钉住这条边界)。
+  - 注释的切法与 templ 逐字对齐:先读到第一个 `--`,再要求紧跟 `>`。所以 `<!--a--b-->` 和 `<!--a--` 都报 `comment contains invalid sequence '--'`,没闭合报 `expected end comment literal '-->' not found`。
+  - **`HTMLComment` 内容不含分隔符**定案(与 templ 的 `Contents` 一致):生成器写回时补 `<!--`/`-->`,由 `generator_test.mbt` 的"a parsed comment keeps its delimiters"钉住。
+  - **偏差:`DocType` 从无载荷变体改成 `DocType(String)`**,携带关键字与 `>` 之间的那段值。templ 的 `DocType` 同样有 `Value` 字段。若保持无载荷,生成器只能硬写 `<!doctype html>`,`<!doctype svg>` / `<!doctype html PUBLIC ...>` 就会被**静默改写成 HTML5 的 doctype** —— 那是产出了错的内容,不是少了个功能。关键字仍然统一成小写(`<!DOCTYPE HTML>` → `<!doctype HTML>`,与 templ 的 `writeDocType` 一致),值原样保留。改动波及 `parser/pkg.generated.mbti` 与 3 处测试字面量。
+  - 端到端实测:写一个带 `<!DOCTYPE html>` 与 `<!-- the greeting -->` 的真实页面走一遍 CLI,产物 HTML 逐字节正确(临时文件已移走)。
+  - 遗留:这次顺带发现产物**不是** `moon fmt` 的不动点(超 80 列的 `write_string` 会被折行),已拆成 T2.19。
 - [ ] **T2.18** 大写模板名生成非法 MoonBit — 生成期明确报错,templ 侧允许 `templ Hello()` 而 MoonBit 的 `fn` 名必须小写写起。**实测证据**:`templ Hello()` 产出 `pub fn Hello() -> Unit` → `Parse error, unexpected token `(`, you may expect `::``;带接收者的 `templ (m : Model) Render()` 产出 `pub fn Model::Render(...)` → `Expected lower case identifier for name of `fn``。报错要指出是模板名的大小写问题并给出模板名与位置,不要让它变成用户看不懂的产物编译错误 · 前置 T2.15 · S
 
 ---

@@ -10,7 +10,11 @@ test "ast values are constructible from outside the package" {
     name: "hello",
     receiver: "",
     params: "name : String",
-    nodes: [@parser.Element(el), @parser.DocType, @parser.HTMLComment("c")],
+    nodes: [
+      @parser.Element(el),
+      @parser.DocType("html"),
+      @parser.HTMLComment("c"),
+    ],
   }
   assert_eq(t.nodes.length(), 3)
   assert_eq(t.nodes[0], @parser.Element(el))

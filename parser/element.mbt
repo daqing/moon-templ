@@ -73,10 +73,7 @@ fn parse_nodes_into(
   match src {
     [] => src
     ['<', ..] => {
-      let (node, rest) = match raw_element_name(src) {
-        Some(name) => parse_raw_element(src, name, offset)
-        None => parse_element(src, offset)
-      }
+      let (node, rest) = parse_tag(src, offset)
       out.push(node)
       parse_nodes_into(rest, offset + consumed(src, rest), stop, out)
     }
@@ -91,6 +88,27 @@ fn parse_nodes_into(
       out.push(Text(buf.to_string()))
       parse_nodes_into(rest, offset + consumed(src, rest), stop, out)
     }
+  }
+}
+
+///|
+/// Anything starting with `<`: a comment or a doctype, a raw text element, or an
+/// ordinary element — in that order. The first two are recognised here rather
+/// than in `parse_element`, which would reject the `!` they open with.
+fn parse_tag(
+  src : StringView,
+  offset : Int32,
+) -> (Node, StringView) raise ParseError {
+  if src.has_prefix("<!--"[:]) {
+    return parse_html_comment(src, offset)
+  }
+  match doctype_open_length(src) {
+    Some(length) => parse_doctype(src, length, offset)
+    None =>
+      match raw_element_name(src) {
+        Some(name) => parse_raw_element(src, name, offset)
+        None => parse_element(src, offset)
+      }
   }
 }
 

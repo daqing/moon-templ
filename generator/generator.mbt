@@ -135,7 +135,7 @@ fn emits_output(nodes : Array[@parser.Node]) -> Bool {
     match node {
       StringExpression(expr) => if !expr.trim().is_empty() { return true }
       Text(text) => if !text.is_empty() { return true }
-      Element(_) | RawElement(_) | HTMLComment(_) | DocType => return true
+      Element(_) | RawElement(_) | HTMLComment(_) | DocType(_) => return true
     }
   }
   false
@@ -230,7 +230,7 @@ fn mentions_in(nodes : Array[@parser.Node], name : String) -> Bool {
           return true
         }
       Element(element) => if mentions_in(element.children, name) { return true }
-      RawElement(_) | Text(_) | HTMLComment(_) | DocType => ()
+      RawElement(_) | Text(_) | HTMLComment(_) | DocType(_) => ()
     }
   }
   false
@@ -288,7 +288,7 @@ fn Generator::write_node(
   level : Int32,
 ) -> Unit raise GenerateError {
   match node {
-    DocType => self.w.write_literal(level, "<!doctype html>")
+    DocType(value) => self.w.write_literal(level, "<!doctype " + value + ">")
     HTMLComment(contents) =>
       self.w.write_literal(level, "<!--" + contents + "-->")
     Element(element) => self.write_element(element, level)

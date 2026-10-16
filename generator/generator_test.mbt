@@ -396,9 +396,45 @@ test "a body that writes nothing names the writer as unused" {
 ///|
 test "a doc type is emitted as it is written in HTML" {
   assert_true(
-    generate_of_nodes([@parser.DocType]).contains(
+    generate_of_nodes([@parser.DocType("html")]).contains(
       "    w.write_string(\"<!doctype html>\")\n",
     ),
+  )
+}
+
+///|
+/// A doctype read from a real template comes back lowercased and with its value
+/// untouched, which is how templ writes one too.
+test "a parsed doctype keeps its value and takes the lowercase keyword" {
+  assert_eq(
+    rendered_html("templ t() {\n  <!DOCTYPE HTML>\n}\n"),
+    "<!doctype HTML>",
+  )
+  assert_eq(
+    rendered_html("templ t() {\n  <!doctype svg>\n}\n"),
+    "<!doctype svg>",
+  )
+}
+
+///|
+/// A comment reaches the output as one literal: the AST drops the delimiters, so
+/// writing them back is the generator's job.
+test "a parsed comment keeps its delimiters" {
+  assert_eq(rendered_html("templ t() {\n  <!--note-->\n}\n"), "<!--note-->")
+  assert_eq(rendered_html("templ t() {\n  <!---->\n}\n"), "<!---->")
+}
+
+///|
+/// A comment between two text runs is a literal like any other, so the run stays
+/// a single `write_string` call.
+test "a comment does not cut the literal run around it" {
+  assert_eq(
+    generate_literals_of_nodes([
+      @parser.Text("a"),
+      @parser.HTMLComment("x"),
+      @parser.Text("b"),
+    ]),
+    ["a<!--x-->b"],
   )
 }
 

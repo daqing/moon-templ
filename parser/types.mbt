@@ -1,7 +1,10 @@
 ///|
 /// A node inside a template body. Recursive through `Element`.
 pub(all) enum Node {
-  DocType
+  /// `<!doctype ...>`, carrying what sits between the keyword and `>` — `html`
+  /// for the usual one.
+  DocType(String)
+  /// `<!-- ... -->`, carrying what sits between the delimiters.
   HTMLComment(String)
   Element(Element)
   RawElement(RawElement)
