@@ -43,7 +43,7 @@ pub fn RangeWriter::literals(Self) -> Array[String]
 pub fn RangeWriter::new(&Logger) -> Self
 pub fn RangeWriter::write_code(Self, String) -> Unit
 pub fn RangeWriter::write_indent(Self, Int, String) -> Unit
-pub fn RangeWriter::write_literal(Self, String) -> Unit
+pub fn RangeWriter::write_literal(Self, Int, String) -> Unit
 
 // Type aliases
 

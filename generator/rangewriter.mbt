@@ -8,13 +8,20 @@
 pub struct RangeWriter {
   priv out : &Logger
   priv mut in_literal : Bool
+  priv mut literal_level : Int32
   priv buf : StringBuilder
   priv literals : Array[String]
 }
 
 ///|
 pub fn RangeWriter::new(out : &Logger) -> RangeWriter {
-  { out, in_literal: false, buf: StringBuilder(), literals: [], }
+  {
+    out,
+    in_literal: false,
+    literal_level: 0,
+    buf: StringBuilder(),
+    literals: [],
+  }
 }
 
 ///|
@@ -29,17 +36,28 @@ pub fn RangeWriter::in_literal(self : RangeWriter) -> Bool {
 }
 
 ///|
-/// Accumulate literal text. Nothing reaches the output until some code, or the
-/// end of the file, forces a flush.
-pub fn RangeWriter::write_literal(self : RangeWriter, s : String) -> Unit {
-  self.in_literal = true
+/// Accumulate literal text at `level` two-space indents. Nothing reaches the
+/// output until some code, or the end of the file, forces a flush.
+///
+/// The level belongs to the literal rather than to whatever flushes it: the run
+/// that ends a body is flushed by the closing brace a level further out, and
+/// should still be indented where it was written.
+pub fn RangeWriter::write_literal(
+  self : RangeWriter,
+  level : Int32,
+  s : String,
+) -> Unit {
+  if !self.in_literal {
+    self.in_literal = true
+    self.literal_level = level
+  }
   self.buf.write_string(s)
 }
 
 ///|
 /// Write code verbatim, flushing any pending literal first.
 pub fn RangeWriter::write_code(self : RangeWriter, s : String) -> Unit {
-  self.flush_literal(0)
+  self.flush_literal()
   self.out.write_string(s)
 }
 
@@ -51,13 +69,13 @@ pub fn RangeWriter::write_indent(
   level : Int32,
   s : String,
 ) -> Unit {
-  self.flush_literal(level)
+  self.flush_literal()
   self.indent(level)
   self.out.write_string(s)
 }
 
 ///|
-fn RangeWriter::flush_literal(self : RangeWriter, level : Int32) -> Unit {
+fn RangeWriter::flush_literal(self : RangeWriter) -> Unit {
   if !self.in_literal {
     return
   }
@@ -68,7 +86,7 @@ fn RangeWriter::flush_literal(self : RangeWriter, level : Int32) -> Unit {
     return
   }
   self.literals.push(literal)
-  self.indent(level)
+  self.indent(self.literal_level)
   self.out.write_string("w.write_string(" + string_literal(literal) + ")\n")
 }
 

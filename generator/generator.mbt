@@ -14,16 +14,18 @@ pub extend GeneratedFile with Eq::{equal, not_equal}
 pub extend GeneratedFile with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
-/// The state a single run carries: the writer, and the counter that hands out
-/// variable names unique within the file.
+/// The state a single run carries: the writer, the counter that hands out
+/// variable names unique within the file, and the template being generated, so
+/// a node with no handler can say which template it came from.
 pub struct Generator {
   priv w : RangeWriter
   priv mut var_id : Int32
+  priv mut template : String
 }
 
 ///|
 pub fn Generator::new(out : &Logger) -> Generator {
-  { w: RangeWriter::new(out), var_id: 0, }
+  { w: RangeWriter::new(out), var_id: 0, template: "", }
 }
 
 ///|
@@ -66,14 +68,10 @@ fn Generator::write_template(
   self : Generator,
   template : @parser.Template,
 ) -> Unit raise GenerateError {
-  if !template.nodes.is_empty() {
-    // The node dispatch table arrives next. Until it does, no node type can be
-    // emitted, and refusing loudly beats generating a component that quietly
-    // drops its body.
-    raise GenerateError(
-      message="cannot generate code for a body containing \{node_name(template.nodes[0])} yet",
-    )
-  }
+  self.template = template.name
+  // The body is dispatched before any of the skeleton is written, so a template
+  // that cannot be generated in full is refused rather than emitted in part.
+  self.write_nodes(template.nodes)
   self.w.write_indent(0, "\n///|\n")
   self.w.write_indent(
     0,
@@ -83,6 +81,45 @@ fn Generator::write_template(
   // unused to keep the generated package warning-free.
   self.w.write_indent(1, "@rt.component(fn(_ctx, _w) {  })\n")
   self.w.write_indent(0, "}\n")
+}
+
+///|
+/// Dispatch the nodes of a body to their handlers, in source order.
+fn Generator::write_nodes(
+  self : Generator,
+  nodes : Array[@parser.Node],
+) -> Unit raise GenerateError {
+  for node in nodes {
+    self.write_node(node)
+  }
+}
+
+///|
+/// The node dispatch table.
+///
+/// The match covers every variant of `@parser.Node`, so a node type added to
+/// the AST has to be dealt with here instead of falling through and quietly
+/// leaving a hole in the output. A type whose handler has not landed yet is
+/// refused by name, rather than skipped.
+fn Generator::write_node(
+  self : Generator,
+  node : @parser.Node,
+) -> Unit raise GenerateError {
+  let at = "in template `" + self.template + "`"
+  match node {
+    DocType => refuse("a doc type", at)
+    HTMLComment(_) => refuse("an HTML comment", at)
+    Element(_) => refuse("an element", at)
+    Text(_) => refuse("a text", at)
+    StringExpression(_) => refuse("an expression", at)
+  }
+}
+
+///|
+fn refuse(kind : String, at : String) -> Unit raise GenerateError {
+  raise GenerateError(
+    message="cannot generate " + kind + " node yet (" + at + ")",
+  )
 }
 
 ///|
@@ -124,16 +161,5 @@ fn after_colon(view : StringView) -> StringView? {
     [] => None
     [':', .. rest] => Some(rest)
     [_, .. rest] => after_colon(rest)
-  }
-}
-
-///|
-fn node_name(node : @parser.Node) -> String {
-  match node {
-    DocType => "doc type"
-    HTMLComment(_) => "HTML comment"
-    Element(_) => "element"
-    Text(_) => "text"
-    StringExpression(_) => "expression"
   }
 }

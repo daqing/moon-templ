@@ -110,15 +110,55 @@ test "an empty component collects no literals" {
 }
 
 ///|
-test "a body no handler covers yet is refused, naming the node" {
-  assert_eq(
-    generate_error_of("templ hello() {\n  <p>hi</p>\n}\n"),
-    "cannot generate code for a body containing element yet",
-  )
+test "a body node with no handler is refused by name" {
   assert_eq(
     generate_error_of("templ hello() {\n  plain text\n}\n"),
-    "cannot generate code for a body containing text yet",
+    "cannot generate a text node yet (in template `hello`)",
   )
+  assert_eq(
+    generate_error_of("templ hello() {\n  <p>hi</p>\n}\n"),
+    "cannot generate an element node yet (in template `hello`)",
+  )
+  assert_eq(
+    generate_error_of("templ hello() {\n  { name }\n}\n"),
+    "cannot generate an expression node yet (in template `hello`)",
+  )
+}
+
+///|
+test "a refusal names the template the node came from" {
+  assert_eq(
+    generate_error_of("templ a() {\n}\n\ntempl b() {\n  <br>\n}\n"),
+    "cannot generate an element node yet (in template `b`)",
+  )
+}
+
+///|
+test "every node type reaches a handler, not just the ones source can produce" {
+  assert_eq(
+    generate_error_of_nodes([@parser.DocType]),
+    "cannot generate a doc type node yet (in template `hello`)",
+  )
+  assert_eq(
+    generate_error_of_nodes([@parser.HTMLComment("note")]),
+    "cannot generate an HTML comment node yet (in template `hello`)",
+  )
+}
+
+///|
+/// Drive the generator from a hand-built body. The parser does not produce doc
+/// types or HTML comments yet, but the dispatch table has to cover them.
+fn generate_error_of_nodes(nodes : Array[@parser.Node]) -> String {
+  let file = @parser.TemplateFile::{
+    templates: [
+      @parser.Template::{ name: "hello", receiver: "", params: "", nodes, },
+    ],
+  }
+  try @generator.generate(file) catch {
+    @generator.GenerateError(message~) => message
+  } noraise {
+    _ => "<no error>"
+  }
 }
 
 ///|
