@@ -1,0 +1,8 @@
+import {
+  "daqing/moon-templ/runtime" @rt,
+  "daqing/moon-templ/examples/site/ui",
+}
+
+formatter(ignore: [ "layout_templ.mbt", "page_templ.mbt" ])
+
+pkgtype(kind: "executable")

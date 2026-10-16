@@ -1,0 +1,15 @@
+templ page(title : String, posts : Array[Post]) {
+  @layout(title) {
+    <ul class="posts">
+      for post in posts {
+        <li class="post">
+          if post.published {
+            @@ui.card(post.title, post.body)
+          } else {
+            <span class="draft">{ post.title }</span>
+          }
+        </li>
+      }
+    </ul>
+  }
+}

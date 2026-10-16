@@ -4,7 +4,7 @@
 拆分日期:2026-10-17
 目标:把 `a-h/templ` 的模板引擎在 MoonBit 中重新实现
 
-**进度:38 / 58**
+**进度:39 / 58**
 
 ---
 
@@ -18,7 +18,7 @@
   | T0 决策与准备 | 5 | 5 | 0 |
   | T1 runtime 地基 | 5 | 5 | 0 |
   | T2 parser + generator 骨架 | 19 | 19 | 0 |
-  | T3 MVP 完整 | 11 | 9 | 0 |
+  | T3 MVP 完整 | 11 | 10 | 0 |
   | T4 属性特殊语义 | 8 | 0 | 0 |
   | T5 工具链与打磨 | 5 | 0 | 1(T5.2) |
   | T6 可选 / 远期 | 5 | 0 | 3 |
@@ -145,7 +145,15 @@
   - **空目录报错退 1**(`no .templ files under <dir>`),不静默成功 —— 路径打错时静默成功是最坏的结果。目录不存在则更早地报 `cannot read <dir>`。
   - **踩到的坑:`Array[String]::sort` 不是字典序!** MoonBit 的 `impl Compare for String` **先比长度再比内容**(`builtin/string.mbt:333`),所以 `["a_templ.mbt", "a.templ", "nested"].sort()` 得到 `nested, a.templ, a_templ.mbt`。实测确认后改用 `sort_by(fn(a, b) { a[:].lexical_compare(b[:]) })`,遍历顺序才和 `ls` 一致且跨机器稳定。**这条对任何"给字符串数组排序"的地方都成立**,值得记住。
   - 单测只覆盖不写盘的部分(`is_tree_argument` / `tree_root` / `templ_files_under` 走真实目录 / `run` 的拒绝分支),沿用 T2.14 的判据:往仓库里写临时文件会留垃圾。写盘与跳过路径**手工实测**(临时树放在 `_scratch/`,移走后无残留):新文件 `generated`、第二次 `is up to date` 且 mtime 不变;批处理里坏模板报错而其余文件照常生成、退 1;手写同名文件被防覆盖挡下且未被改动;`generate ./...` 在仓库根跑完整棵树,`examples/hello/hello_templ.mbt` 报 `is up to date` 且 mtime 不变。
-- [ ] **T3.10** **端到端 M2**:写一个真实页面 — 布局组件 + 循环 + 条件 + children + 跨包组件调用,输出正确 · 前置 T3.3、T3.5、T3.6 · M
+- [x] **T3.10** **端到端 M2**:写一个真实页面 — 布局组件 + 循环 + 条件 + children + 跨包组件调用,输出正确 · 前置 T3.3、T3.5、T3.6 · M
+  - 落点是 `examples/site`(**两个包**,这是第一次真的跨包):`examples/site/layout.templ`(带 `{ children... }` 的整页骨架)、`examples/site/page.templ`(页面:调 `@layout(...)` 并把列表作为 children 交给它,里面 `for post in posts`,每个 post 走 `if post.published`,真分支调 `@@ui.card(...)`)、`examples/site/ui/card.templ`(可复用的卡片组件),外加 `models.mbt`(`Post` 结构)与 `main.mbt`(`moon run examples/site` 直接打出整页 HTML)。一个页面同时覆盖布局 + 循环 + 条件 + children + 跨包调用五件事。
+  - **跨包调用要动 `moon.pkg`**:`examples/site/moon.pkg` 里 import `daqing/moon-templ/examples/site/ui`(产物写的是 `@ui.card(...)`)。写文件时显式写了 `@ui` 别名,`moon fmt` 把它删了 —— 末段名就是默认别名,删掉照样编过,说明这条路不依赖别名而依赖包名。
+  - **逐字节对 templ 校验**:三个模板体分别喂给 Go 探针的 `literals` 模式(`_scratch/probe/sitecases.txt`),布局与卡片两支的**字面量序列与我们的产物完全一致**;页面那支探针只吃 Go 的循环头(`for _, item := range items`),把头部换成 Go 拼法后字面量同样是 `<ul class="posts">` `<li class="post">` `<span class="draft">` `§` `</span>` `</li>` `</ul>` —— 换行全部被块吞掉,标签之间没有空白。顺带钉死两件事:(a) `<!DOCTYPE html>` → `<!doctype html>` 的大小写变化是 **templ 自己的行为**,不是我们的偏差;(b) `@call { ... }` 的 children 块在 templ 里也是一个内嵌组件、且**继承外层已 clear 的 ctx**,与 `with_children(@rt.component(...))` 一致。
+  - 断言(`examples/site/site_wbtest.mbt`,3 个):整页 HTML 逐字节相等;空 posts 时布局照旧包住空 `<ul class="posts"></ul>`;数据里的文本**被转义**(`Q&A` / `Tea & crumpets <3` / `5 > 4` —— 页面自己写的那处与**另一个包里卡片写的那处**都转义)。
+  - **防漂移守卫扩到全树**:`cli/example_wbtest.mbt` 原来只盯 `examples/hello`,现在遍历 `example_templates()` 里的四个模板逐个比对产物;另加一条"树里走到的模板集合 == 清单"的测试,新加一个 example 忘了登记会在这里红,而不是"签入了却从没被校验过"。`cli_test.mbt` 里 walk 的期望值同步成四个(顺带真的覆盖了子目录 `examples/site/ui`)。
+  - 实测证据:`moon check` 零警告;`moon test` **316 passed / 0 failed**(较 T3.9 的 312 多出 3 个 example 测试 + 1 个守卫测试);`moon run examples/site` 打出的整页与断言逐字节相同;再跑一次 `generate examples/site/...` 三份产物都报 `is up to date` 且 mtime 不变(产物是 `moon fmt` 的不动点,`formatter(ignore:)` 覆盖了新包的两个产物)。
+  - **仍然存在的运行时缺口(非本次引入)**:T3.7 生成的 `@rt.render_attributes` 要等 **T4.1** 才有实现,所以这个页面**故意不用** `{ attrs... }`;`{ attrs... }` 现在能解析、能生成,但产物要等 T4.1 才编得过(此前 spread 是解析错误,所以没有回归)。
+  - **M2 达成**:`moon-templ` 现在能写这样一个真实页面并输出正确 HTML。
 - [ ] **T3.11** 移植 templ 条件/循环/调用 golden — `test-if` / `test-for` / `test-call` 目录转为 MoonBit 快照测试 · 前置 T3.6 · M
 
 ---

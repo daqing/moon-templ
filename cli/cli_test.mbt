@@ -82,9 +82,15 @@ test "a tree argument's root is the directory it spells" {
 /// The walk reaches into subdirectories, and reports what it finds in name
 /// order so a batch reads the same way on every run.
 test "the walk finds every template under a directory" {
-  assert_eq(@cli.templ_files_under("examples"), ["examples/hello/hello.templ"])
-  assert_eq(@cli.templ_files_under("examples/hello"), [
-    "examples/hello/hello.templ",
+  assert_eq(@cli.templ_files_under("examples"), [
+    "examples/hello/hello.templ", "examples/site/layout.templ", "examples/site/page.templ",
+    "examples/site/ui/card.templ",
+  ])
+  assert_eq(@cli.templ_files_under("examples/site"), [
+    "examples/site/layout.templ", "examples/site/page.templ", "examples/site/ui/card.templ",
+  ])
+  assert_eq(@cli.templ_files_under("examples/site/ui"), [
+    "examples/site/ui/card.templ",
   ])
 }
 

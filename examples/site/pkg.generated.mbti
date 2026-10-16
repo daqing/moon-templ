@@ -1,0 +1,24 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "daqing/moon-templ/examples/site"
+
+import {
+  "daqing/moon-templ/runtime",
+}
+
+// Values
+pub fn layout(String) -> @runtime.Component
+
+pub fn page(String, Array[Post]) -> @runtime.Component
+
+// Errors
+
+// Types and methods
+pub struct Post {
+  title : String
+  body : String
+  published : Bool
+}
+
+// Type aliases
+
+// Traits
