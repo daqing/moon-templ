@@ -1286,3 +1286,43 @@ test "differential: matches templ's whitespace output" {
   assert_eq(preview("<b>text  { x }</b>"), "<b>text  §</b>")
   assert_eq(preview("<b>text\t{ x }</b>"), "<b>text\t§</b>")
 }
+
+///|
+// A call renders by calling out to the component, so templ emits no literal for
+// the call itself and the recording above holds the literals around it. `c()` is
+// the component the probe declares for exactly that purpose.
+test "differential: whitespace around a component call" {
+  assert_eq(preview("<p>a @c() b</p>"), "<p>a  b</p>")
+  assert_eq(preview("<p>a\n@c()\nb</p>"), "<p>a b</p>")
+  assert_eq(preview("<p>a  @c()</p>"), "<p>a  </p>")
+  assert_eq(preview("<p>a @c()</p>"), "<p>a </p>")
+  assert_eq(preview("<p>a@c()</p>"), "<p>a@c()</p>")
+  assert_eq(preview("<p> @c()</p>"), "<p></p>")
+  assert_eq(preview("<p>@c()</p>"), "<p></p>")
+  assert_eq(preview("<p>@c() </p>"), "<p></p>")
+  assert_eq(preview("<p>@c() @c()</p>"), "<p></p>")
+  assert_eq(preview("<p>a <b>x</b> @c()</p>"), "<p>a <b>x</b></p>")
+  assert_eq(preview("<p><b>x</b> @c()</p>"), "<p><b>x</b></p>")
+  assert_eq(preview("<p><span>a</span> @c()</p>"), "<p><span>a</span></p>")
+  assert_eq(preview("<p>@c() <span>a</span></p>"), "<p><span>a</span></p>")
+  assert_eq(preview("<p>@c() <div>a</div></p>"), "<p><div>a</div></p>")
+  assert_eq(preview("<p>{ x } @c()</p>"), "<p>§ </p>")
+  assert_eq(preview("<p>{ x }\n@c()</p>"), "<p>§</p>")
+  assert_eq(preview("<p>a\n\n@c()\nb</p>"), "<p>a b</p>")
+  assert_eq(preview("<p>a \n @c()</p>"), "<p>a </p>")
+  assert_eq(preview("<div><p>a @c() b</p></div>"), "<div><p>a  b</p></div>")
+  assert_eq(
+    preview("<div><p>a @c() { x } b</p></div>"),
+    "<div><p>ax b</p></div>",
+  )
+  assert_eq(preview("<p>@c() { x }</p>"), "<p>x </p>")
+  assert_eq(preview("<p>@c(){x}</p>"), "<p>x</p>")
+  assert_eq(preview("<p>a @c() { b @c() } c</p>"), "<p>ab c</p>")
+  assert_eq(preview("<p>@c() {}</p>"), "<p></p>")
+  assert_eq(preview("<p>@c() { }</p>"), "<p></p>")
+  assert_eq(preview("<p>@c() {\n  x\n}</p>"), "<p>x</p>")
+  assert_eq(preview("<p>@c()\n{ x }</p>"), "<p> §</p>")
+  assert_eq(preview("<p><div>a</div> @c()</p>"), "<p><div>a</div></p>")
+  assert_eq(preview("<p><div>a</div>\n@c()</p>"), "<p><div>a</div></p>")
+  assert_eq(preview("<p>hello @c() world</p>"), "<p>hello  world</p>")
+}

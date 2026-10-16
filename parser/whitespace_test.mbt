@@ -23,11 +23,17 @@ fn is_void(name : String) -> Bool {
 /// Render a normalized node list, standing in for an expression with `§`. The
 /// expected values below were captured from templ's own generator so that the
 /// MoonBit rules stay byte-identical to the implementation being ported.
+///
+/// A call prints nothing: templ renders it by calling out to the component, so
+/// the literals templ emits for a body are the ones around the call, and its
+/// children's literals land where the call stands. Printing the children and
+/// nothing else lines the two recordings up.
 fn preview_nodes(nodes : Array[@parser.Node], buf : StringBuilder) -> Unit {
   for node in nodes {
     match node {
       Text(s) => buf.write_string(s)
       StringExpression(_) => buf.write_string("§")
+      Call(call) => preview_nodes(call.children, buf)
       Element(e) => {
         buf.write_string("<" + e.name + ">")
         preview_nodes(e.children, buf)

@@ -18,6 +18,8 @@ pub fn normalize_whitespace(Array[Node]) -> Array[Node]
 
 pub fn parse_attributes(StringView, Int) -> (Array[Attribute], StringView, Bool) raise ParseError
 
+pub fn parse_call(StringView, Int) -> (Node, StringView) raise ParseError
+
 pub fn parse_nodes(StringView, Int, (StringView) -> Bool) -> (Array[Node], StringView) raise ParseError
 
 pub fn parse_template_file(String) -> TemplateFile raise ParseError
@@ -42,6 +44,14 @@ pub fn Attribute::equal(Self, Self) -> Bool
 pub fn Attribute::not_equal(Self, Self) -> Bool
 pub fn Attribute::to_repr(Self) -> @debug.Repr
 
+pub(all) struct Call {
+  expression : String
+  children : Array[Node]
+} derive(Eq, @debug.Debug)
+pub fn Call::equal(Self, Self) -> Bool
+pub fn Call::not_equal(Self, Self) -> Bool
+pub fn Call::to_repr(Self) -> @debug.Repr
+
 pub(all) struct Element {
   name : String
   attrs : Array[Attribute]
@@ -55,6 +65,7 @@ pub fn Element::to_repr(Self) -> @debug.Repr
 pub(all) enum Node {
   DocType(String)
   HTMLComment(String)
+  Call(Call)
   Element(Element)
   RawElement(RawElement)
   Text(String)

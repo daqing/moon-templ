@@ -59,8 +59,11 @@ pub fn is_block_element(name : String) -> Bool {
 
 ///|
 /// Whether a node counts as inline content when deciding to keep a space next to
-/// it. Control flow and component calls are inline; comments and doctypes are
-/// not.
+/// it. Text and inline elements are. Control flow will have to be too once it
+/// lands: what a branch writes is inline exactly when the branch is. A component
+/// call is not, even though it usually renders inline — nothing about the call
+/// says what it produces, so a space next to one is kept only by the rules that
+/// name calls outright.
 pub fn is_inline(node : Node) -> Bool {
   match node {
     Text(_) | StringExpression(_) => true
@@ -75,7 +78,9 @@ priv enum Piece {
   /// A run of template text with no whitespace in it, kept verbatim.
   Literal(String)
   /// A whitespace run that collapses to one space, or disappears entirely.
-  Gap
+  /// `vertical` marks a run with a newline in it, which some of the rules below
+  /// treat differently from a run that stays on one line.
+  Gap(vertical~ : Bool)
   /// Any other node.
   Nested(Node)
 }
@@ -84,10 +89,10 @@ priv enum Piece {
 /// Normalize whitespace in a node list.
 ///
 /// Whitespace inside a line of text is kept verbatim. A whitespace run that
-/// starts a text node, or that contains a newline, becomes a single space when
-/// it sits between two inline nodes and is dropped otherwise. That reproduces
-/// templ's rule of consuming the whitespace that trails a node, while leaving
-/// the run that precedes a tag inside the text itself.
+/// starts a text node, or that contains a newline, becomes a single space where
+/// `keeps_gap` says so and is dropped otherwise. That reproduces templ's rule of
+/// consuming the whitespace that trails a node, while leaving the run that
+/// precedes a tag inside the text itself.
 pub fn normalize_whitespace(nodes : Array[Node]) -> Array[Node] {
   let pieces : Array[Piece] = []
   for node in nodes {
@@ -148,12 +153,22 @@ fn split_text(value : String, out : Array[Piece]) -> Unit {
         if split > i {
           out.push(Literal(build(chars, i, split)))
         }
-        out.push(Gap)
+        out.push(Gap(vertical=has_newline(chars, split, j)))
       }
     }
     first = false
     i = j
   }
+}
+
+///|
+fn has_newline(chars : Array[Char], from : Int32, to : Int32) -> Bool {
+  for i = from; i < to; i = i + 1 {
+    if chars[i] == '\n' {
+      return true
+    }
+  }
+  false
 }
 
 ///|
@@ -172,11 +187,8 @@ fn emit(pieces : Array[Piece]) -> Array[Node] {
     match piece {
       Nested(node) => out.push(node)
       Literal(value) => out.push(Text(value))
-      Gap =>
-        if i > 0 &&
-          i + 1 < pieces.length() &&
-          is_inline_piece(pieces[i - 1]) &&
-          is_inline_piece(pieces[i + 1]) {
+      Gap(vertical~) =>
+        if keeps_gap(pieces, i, vertical) {
           out.push(Text(" "))
         }
     }
@@ -185,10 +197,59 @@ fn emit(pieces : Array[Piece]) -> Array[Node] {
 }
 
 ///|
+/// Whether the gap at `at` survives as a single space.
+///
+/// A run between two inline pieces is kept. A component call is not inline, so
+/// it gets rules of its own: a self-closing call keeps the whitespace when text
+/// follows it, and text keeps the whitespace when a self-closing call follows,
+/// but only for a run on the same line — a call written on the next line is
+/// laid out as a block and pulls no space after the text above it.
+fn keeps_gap(pieces : Array[Piece], at : Int32, vertical : Bool) -> Bool {
+  if at == 0 || at + 1 >= pieces.length() {
+    return false
+  }
+  let before = pieces[at - 1]
+  let after = pieces[at + 1]
+  if is_inline_piece(before) && is_inline_piece(after) {
+    return true
+  }
+  if is_self_closing_call(before) && is_text_piece(after) {
+    return true
+  }
+  if is_text_piece(before) && is_self_closing_call(after) {
+    return !vertical
+  }
+  false
+}
+
+///|
 fn is_inline_piece(piece : Piece) -> Bool {
   match piece {
     Literal(_) => true
-    Gap => false
+    Gap(_) => false
     Nested(node) => is_inline(node)
+  }
+}
+
+///|
+/// A piece that is text, or writes text: the two things a call keeps company
+/// with. An element is neither, whatever it renders.
+fn is_text_piece(piece : Piece) -> Bool {
+  match piece {
+    Literal(_) => true
+    Nested(StringExpression(_)) => true
+    Gap(_) | Nested(_) => false
+  }
+}
+
+///|
+/// A call with no children block. templ treats one as it treats text — standing
+/// where text stands, it keeps its neighbouring space — with the single
+/// exception `keeps_gap` weighs itself: text keeps a space before a call only
+/// when the run between them stayed on one line.
+fn is_self_closing_call(piece : Piece) -> Bool {
+  match piece {
+    Nested(Call(call)) => call.children.is_empty()
+    _ => false
   }
 }

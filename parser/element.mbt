@@ -77,6 +77,11 @@ fn parse_nodes_into(
       out.push(node)
       parse_nodes_into(rest, offset + consumed(src, rest), stop, out)
     }
+    ['@', ..] => {
+      let (node, rest) = parse_call(src, offset)
+      out.push(node)
+      parse_nodes_into(rest, offset + consumed(src, rest), stop, out)
+    }
     ['{', .. rest] => {
       let (expr, after) = scan_expression(rest, offset)
       out.push(StringExpression(expr))
@@ -84,10 +89,52 @@ fn parse_nodes_into(
     }
     _ => {
       let buf = StringBuilder()
-      let rest = take_text(src, buf, stop)
+      let rest = if is_space_run_before_at(src) {
+        take_space_run(src, buf)
+      } else {
+        take_text(src, buf, stop)
+      }
       out.push(Text(buf.to_string()))
       parse_nodes_into(rest, offset + consumed(src, rest), stop, out)
     }
+  }
+}
+
+///|
+/// Whether `src` is a whitespace run with nothing after it but a `@`.
+///
+/// templ gives the whitespace that trails a node to that node, so a `@` starts a
+/// call only once nothing but whitespace stands between it and the text before
+/// it — and at the very start of a node list nobody is there to take that
+/// whitespace, which is why the run has to be read on its own rather than left
+/// to end the text before it.
+fn is_space_run_before_at(src : StringView) -> Bool {
+  match src {
+    [c, .. rest] if is_space(c) =>
+      match scan_space_run(rest) {
+        ['@', ..] => true
+        _ => false
+      }
+    _ => false
+  }
+}
+
+///|
+fn scan_space_run(src : StringView) -> StringView {
+  match src {
+    [c, .. rest] if is_space(c) => scan_space_run(rest)
+    _ => src
+  }
+}
+
+///|
+fn take_space_run(src : StringView, buf : StringBuilder) -> StringView {
+  match src {
+    [c, .. rest] if is_space(c) => {
+      buf.write_char(c)
+      take_space_run(rest, buf)
+    }
+    _ => src
   }
 }
 
@@ -116,6 +163,10 @@ fn parse_tag(
 /// Text runs until the next tag or expression; those are separate nodes. It also
 /// stops where `stop` matches, which is how the `}` closing a template body ends
 /// the final text node.
+///
+/// A `@` preceded by whitespace ends it as well, leaving that whitespace to the
+/// text node after it. That is how templ separates `a @c()`, which is the text
+/// `a` and a call, from `a@c()`, which is one run of text.
 fn take_text(
   src : StringView,
   buf : StringBuilder,
@@ -128,6 +179,7 @@ fn take_text(
     [] => src
     ['<', ..] => src
     ['{', ..] => src
+    [c, next, ..] if is_space(c) && next == '@' => src
     [c, .. rest] => {
       buf.write_char(c)
       take_text(rest, buf, stop)

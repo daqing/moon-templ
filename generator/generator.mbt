@@ -83,13 +83,13 @@ fn Generator::write_template(
     "pub fn " + declaration(template) + " -> @rt.Component {\n",
   )
   let unused = unused_params(template)
-  // A template that writes nothing never touches `w`, so the closure names it as
-  // unused instead of leaving a warning behind.
-  let writer = if emits_output(template.nodes) { "w" } else { "_w" }
   if template.nodes.is_empty() && unused.is_empty() {
     self.w.write_indent(1, "@rt.component(fn(_ctx, _w) {  })\n")
   } else {
-    self.w.write_indent(1, "@rt.component(fn(_ctx, " + writer + ") {\n")
+    self.w.write_indent(
+      1,
+      "@rt.component(fn(" + closure_params(template.nodes) + ") {\n",
+    )
     for name in unused {
       self.w.write_indent(2, "ignore(" + name + ")\n")
     }
@@ -97,6 +97,35 @@ fn Generator::write_template(
     self.w.write_indent(1, "})\n")
   }
   self.w.write_indent(0, "}\n")
+}
+
+///|
+/// The parameter list of the closure a body becomes.
+///
+/// A closure that writes nothing names its writer `_w`, and one that calls no
+/// component names its render context `_ctx`: MoonBit warns about a parameter
+/// nothing reads, and a generated file has to compile without warnings.
+fn closure_params(nodes : Array[@parser.Node]) -> String {
+  let ctx = if calls_component(nodes) { "ctx" } else { "_ctx" }
+  ctx + ", " + (if emits_output(nodes) { "w" } else { "_w" })
+}
+
+///|
+/// Whether anything in the body renders a component, which is what makes the
+/// closure's render context a name rather than an underscore.
+fn calls_component(nodes : Array[@parser.Node]) -> Bool {
+  for node in nodes {
+    match node {
+      Call(_) => return true
+      Element(element) => if calls_component(element.children) { return true }
+      Text(_)
+      | StringExpression(_)
+      | RawElement(_)
+      | HTMLComment(_)
+      | DocType(_) => ()
+    }
+  }
+  false
 }
 
 ///|
@@ -158,14 +187,15 @@ fn unused_params(template : @parser.Template) -> Array[String] {
 
 ///|
 /// Whether a body writes anything at all. Only an empty expression writes
-/// nothing; a tag, a doctype, a comment or any text reaches the output, so this
-/// errs towards "it writes".
+/// nothing; a tag, a doctype, a comment, a call or any text reaches the output,
+/// so this errs towards "it writes".
 fn emits_output(nodes : Array[@parser.Node]) -> Bool {
   for node in nodes {
     match node {
       StringExpression(expr) => if !expr.trim().is_empty() { return true }
       Text(text) => if !text.is_empty() { return true }
-      Element(_) | RawElement(_) | HTMLComment(_) | DocType(_) => return true
+      Call(_) | Element(_) | RawElement(_) | HTMLComment(_) | DocType(_) =>
+        return true
     }
   }
   false
@@ -259,6 +289,11 @@ fn mentions_in(nodes : Array[@parser.Node], name : String) -> Bool {
         if mentions(expr[:], name[:], None) {
           return true
         }
+      Call(call) =>
+        if mentions(call.expression[:], name[:], None) ||
+          mentions_in(call.children, name) {
+          return true
+        }
       Element(element) =>
         if mentions_in_attrs(element.attrs, name) ||
           mentions_in(element.children, name) {
@@ -341,11 +376,42 @@ fn Generator::write_node(
     DocType(value) => self.w.write_literal(level, "<!doctype " + value + ">")
     HTMLComment(contents) =>
       self.w.write_literal(level, "<!--" + contents + "-->")
+    Call(call) => self.write_call(call, level)
     Element(element) => self.write_element(element, level)
     RawElement(raw) => self.write_raw_element(raw, level)
     Text(text) => self.w.write_literal(level, text)
     StringExpression(expr) => self.write_expression(expr, level)
   }
+}
+
+///|
+/// A component call renders to the component the expression names. The call
+/// marker is not part of the expression, so `@Card(title)` becomes
+/// `Card(title).render(ctx, w)` and a package-qualified `@@ui.Card(title)`
+/// becomes `@ui.Card(title).render(ctx, w)`.
+///
+/// A call with a children block hands them to the component as a component of
+/// its own. The block gets a fresh context: the children are the called
+/// component's to place, so they must not also be able to reach the children of
+/// the template that is calling it.
+fn Generator::write_call(
+  self : Generator,
+  call : @parser.Call,
+  level : Int32,
+) -> Unit raise GenerateError {
+  if call.children.is_empty() {
+    self.w.write_indent(level, call.expression + ".render(ctx, w)\n")
+    return
+  }
+  self.w.write_indent(
+    level,
+    call.expression +
+    ".with_children(@rt.component(fn(" +
+    closure_params(call.children) +
+    ") {\n",
+  )
+  self.write_nodes(call.children, level + 1)
+  self.w.write_indent(level, "})).render(ctx, w)\n")
 }
 
 ///|

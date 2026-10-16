@@ -1,15 +1,27 @@
 ///|
-/// A node inside a template body. Recursive through `Element`.
+/// A node inside a template body. Recursive through `Element` and `Call`.
 pub(all) enum Node {
   /// `<!doctype ...>`, carrying what sits between the keyword and `>` — `html`
   /// for the usual one.
   DocType(String)
   /// `<!-- ... -->`, carrying what sits between the delimiters.
   HTMLComment(String)
+  /// `@expr` or `@expr { ... }`.
+  Call(Call)
   Element(Element)
   RawElement(RawElement)
   Text(String)
   StringExpression(String)
+} derive(Debug, Eq)
+
+///|
+/// A component call. `expression` is the source spelling of what follows the
+/// `@` marker, so `@@ui.Card(title)` keeps the package reference's own `@` while
+/// `@Card(title)` does not. Empty `children` means the call stands alone: a
+/// block that holds nothing but whitespace leaves nothing behind either.
+pub(all) struct Call {
+  expression : String
+  children : Array[Node]
 } derive(Debug, Eq)
 
 ///|
@@ -60,6 +72,12 @@ pub extend Node with Eq::{equal, not_equal}
 
 ///|
 pub extend Node with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend Call with Eq::{equal, not_equal}
+
+///|
+pub extend Call with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
 pub extend Element with Eq::{equal, not_equal}
