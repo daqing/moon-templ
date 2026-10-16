@@ -136,12 +136,9 @@ fn parse_element(
     _ => raise ParseError(offset~, message="expected element name")
   }
   let name = name_buf.to_string()
-  let (after_attrs, self_closing) = skip_attrs(after_name, offset)
+  let (attrs, after_attrs, self_closing) = parse_attributes(after_name, offset)
   if self_closing || is_void_element(name) {
-    return (
-      Element({ name, attrs: [], children: [], self_closing, }),
-      after_attrs,
-    )
+    return (Element({ name, attrs, children: [], self_closing, }), after_attrs)
   }
   let close = "</" + name + ">"
   let (children, at_close) = parse_nodes(
@@ -153,7 +150,7 @@ fn parse_element(
     [] => raise ParseError(offset~, message="unclosed element <" + name + ">")
     _ => drop_prefix(at_close, close[:])
   }
-  (Element({ name, attrs: [], children, self_closing: false, }), rest)
+  (Element({ name, attrs, children, self_closing: false, }), rest)
 }
 
 ///|
@@ -161,56 +158,5 @@ fn drop_prefix(view : StringView, prefix : StringView) -> StringView {
   match view.get_view(start=prefix.length()) {
     Some(rest) => rest
     None => ""[:]
-  }
-}
-
-///|
-/// Skip the attribute list to the end of the start tag. Values are skipped
-/// without being interpreted; quoting is honoured so `>` inside a value does
-/// not end the tag.
-fn skip_attrs(
-  src : StringView,
-  offset : Int32,
-) -> (StringView, Bool) raise ParseError {
-  match src {
-    [] => raise ParseError(offset~, message="unterminated start tag")
-    ['/', '>', .. rest] => (rest, true)
-    ['>', .. rest] => (rest, false)
-    ['"', .. rest] => {
-      let (_, after) = scan_quoted(rest, '"', offset)
-      skip_attrs(after, offset)
-    }
-    ['\'', .. rest] => {
-      let (_, after) = scan_quoted(rest, '\'', offset)
-      skip_attrs(after, offset)
-    }
-    [_, .. rest] => skip_attrs(rest, offset)
-  }
-}
-
-///|
-fn scan_quoted(
-  src : StringView,
-  quote : Char,
-  offset : Int32,
-) -> (String, StringView) raise ParseError {
-  let buf = StringBuilder()
-  scan_quoted_into(src, quote, offset, buf)
-}
-
-///|
-fn scan_quoted_into(
-  src : StringView,
-  quote : Char,
-  offset : Int32,
-  buf : StringBuilder,
-) -> (String, StringView) raise ParseError {
-  match src {
-    [] => raise ParseError(offset~, message="unterminated quoted value")
-    [c, .. rest] if c == quote => (buf.to_string(), rest)
-    [c, .. rest] => {
-      buf.write_char(c)
-      scan_quoted_into(rest, quote, offset, buf)
-    }
   }
 }

@@ -106,8 +106,8 @@ test "an unclosed element is an error" {
 
 ///|
 test "an angle bracket inside a quoted attribute does not end the tag" {
-  assert_eq(parse("<img src=\"a>b\">"), [el("img", [], false)])
-  assert_eq(parse("<img src='a>b'>"), [el("img", [], false)])
+  assert_eq(attrs_of("<img src=\"a>b\">"), [constant("src", "a>b")])
+  assert_eq(attrs_of("<img src='a>b'>"), [constant("src", "a>b")])
 }
 
 ///|

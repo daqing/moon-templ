@@ -6,6 +6,8 @@ import {
 }
 
 // Values
+pub fn parse_attributes(StringView, Int) -> (Array[Attribute], StringView, Bool) raise ParseError
+
 pub fn parse_nodes(StringView, Int, (StringView) -> Bool) -> (Array[Node], StringView) raise ParseError
 
 pub fn scan_expression(StringView, Int) -> (String, StringView) raise ParseError
