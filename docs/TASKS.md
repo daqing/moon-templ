@@ -4,7 +4,7 @@
 拆分日期:2026-10-17
 目标:把 `a-h/templ` 的模板引擎在 MoonBit 中重新实现
 
-**进度:28 / 58**
+**进度:29 / 58**
 
 ---
 
@@ -17,7 +17,7 @@
   |---|---|---|---|
   | T0 决策与准备 | 5 | 5 | 0 |
   | T1 runtime 地基 | 5 | 5 | 0 |
-  | T2 parser + generator 骨架 | 19 | 18 | 0 |
+  | T2 parser + generator 骨架 | 19 | 19 | 0 |
   | T3 MVP 完整 | 11 | 0 | 0 |
   | T4 属性特殊语义 | 8 | 0 | 0 |
   | T5 工具链与打磨 | 5 | 0 | 1(T5.2) |
@@ -97,10 +97,10 @@
   - 全链路实测(把产物先移走再走一遍):产物缺失时 `moon build` 失败 → `moon run cmd/main -- generate examples/hello/hello.templ` → `moon build` 通过 → `moon run examples/hello` 打出 `<div class="greeting">Hello, world!</div>`。
   - **漂移护栏** `cli/example_wbtest.mbt`:读回 `.templ` 与已提交的产物、比对,而**不是**原地重新生成 —— 原地重写在有漂移时会把文件"顺手修好",测试反而永远绿。已实测:手动往产物里塞一行,护栏立刻变红。
   - **关键发现:`moon fmt` 会把一个块里的语句全部对齐到块自身的层级**,所以在产物里按元素深度缩进是白费功夫,格式化一次就被抹平(实测:格式化和未格式化的产物差的就是 `@rt.write_any` 那一行的缩进)。据此把 `write_element` 的子节点改回与父同级 —— **只有块**(模板体、以后的 `if`/`for`)才推层级,HTML 标签不推。T2.13 顺带加进 `RangeWriter` 的"取最外层层级"规则是在给更深的缩进打补丁,一并撤回。
-  - 结果:生成的产物在 `moon fmt` 下**保持不变**(已用 `diff` 实测),这条比 T2.16 的 `@fmt.format` 内联更省事 —— T2.16 到那时只剩未使用变量的警告对策与 `///|` 分隔的复查。
+  - 结果:生成的产物在 `moon fmt` 下保持不变(已用 `diff` 实测)。**但这个结论只对 `examples/hello` 这种短行产物成立** —— T2.19 实测 `moon fmt` 会折行超过 80 列的语句,长字面量或长表达式的产物照样被重排;正式做法是 `formatter(ignore: [...])`(见 T2.19 与 port-research §6.1)。
   - 记录:`moon test` 的工作目录是**模块根**,不是包目录,所以测试里的路径写成 `examples/hello/hello.templ` 这种模块根相对路径。
 - [x] **T2.16** 生成后内联 `@fmt.format` 规范化产物 — 产物格式规范、`///|` 块分隔齐全(port-research §6)。**同时定案 `unused_value` 的产物侧对策**:未使用的模板参数、以及只写空表达式(`{ }`)导致 `w` 没被用到的模板,产物不能带警告 · 前置 T2.15 · S
-  - **`@fmt.format` 内联:实测后决定不做,偏差已记入 port-research §6.1。** 证据:临时加上 `moonbitlang/parser@0.4.5` 后,`@fmt.format(generated.source)` 会把产物改成另一种版式(`@rt.component(` 的闭包参数独占一行并带尾逗号、文件开头的空行挪到注释之前),而 `moon fmt` 又把它**改回我们现在的版式**(把 `@fmt.format` 的产物落盘后跑 `moon fmt`,再与产物 `diff` —— 完全一致)。也就是说这条链上的 `@fmt.format` 比工具链里的 `moon fmt` 旧,内联它等于主动生成一个 `moon fmt` 立刻要重写的文件,还会当场把 T2.15 的漂移护栏弄红。另外 `moonbitlang/parser/fmt` 自己的 README 标着 "highly experimental and work in progress",注释与空行两项状态未打勾,依赖树也不小(x、lexer、moon_config、async、prettyprinter)。**采纳的判据是"产物是 `moon fmt` 的不动点"**,而不是"产物经过某个 formatter";这条已由 T2.15 的漂移护栏兜住:产物一旦被 `moon fmt` 改写,护栏立刻变红。`///|` 分隔由 `write_template` 自己发,`moon fmt` 保持不变。等 T3.x 出现 `if`/`for` 的真正嵌套块、靠构造维持不动点不再划算时再回来评估。
+  - **`@fmt.format` 内联:实测后决定不做,偏差已记入 port-research §6.1。** 证据:临时加上 `moonbitlang/parser@0.4.5` 后,`@fmt.format(generated.source)` 会把产物改成另一种版式(`@rt.component(` 的闭包参数独占一行并带尾逗号、文件开头的空行挪到注释之前),而 `moon fmt` 又把它**改回我们现在的版式**(把 `@fmt.format` 的产物落盘后跑 `moon fmt`,再与产物 `diff` —— 完全一致)。也就是说这条链上的 `@fmt.format` 比工具链里的 `moon fmt` 旧,内联它等于主动生成一个 `moon fmt` 立刻要重写的文件,还会当场把 T2.15 的漂移护栏弄红。另外 `moonbitlang/parser/fmt` 自己的 README 标着 "highly experimental and work in progress",注释与空行两项状态未打勾,依赖树也不小(x、lexer、moon_config、async、prettyprinter)。**采纳的判据是"产物贴着 `moon fmt` 的版式写"**,而不是"产物经过某个 formatter";`///|` 分隔由 `write_template` 自己发。**但"产物是 `moon fmt` 的不动点"这个更强的说法是错的,T2.19 已实测更正**(`moon fmt` 折行超过 80 列的行,而抄进产物的表达式长度由用户决定)。
   - **`unused_value` 定案**:未使用的参数与接收者在闭包体开头 `ignore(x)` —— 签名由模板作者决定,不能因为体里没读就删,`ignore` 保住调用点的具名写法;`ignore` 一个其实被用到的名字零代价,所以判不准时一律算"被用到",最坏是多一条警告而不会让体坏掉。`~name` 这类带标签(以及任何非平凡标识符)的参数**跳过不动**:调用点怎么拼是调用者的事,生成器不能替他改。体不产生任何输出时,写游标参数直接叫 `_w` 而不是 `w` + `ignore(w)`(空体的产物因此更短:一次 `@rt.component(fn(_ctx, _w) {  })`)。
   - "体里有没有读这个参数"的判据是**只在 `StringExpression` 里搜**(元素递归下去),文本节点不算 —— `<p>name</p>` 里的 `name` 是给用户看的字,不是读参数。匹配按**整词**边界(`mentions`),否则参数 `a` 会被 `ab` 误判成已用。
   - 结果:三个原先各带一条 `unused_value` 警告的模板全部无警告;generator 包 57 个测试、全模块 154 个测试通过。
@@ -112,7 +112,12 @@
   - **偏差:`DocType` 从无载荷变体改成 `DocType(String)`**,携带关键字与 `>` 之间的那段值。templ 的 `DocType` 同样有 `Value` 字段。若保持无载荷,生成器只能硬写 `<!doctype html>`,`<!doctype svg>` / `<!doctype html PUBLIC ...>` 就会被**静默改写成 HTML5 的 doctype** —— 那是产出了错的内容,不是少了个功能。关键字仍然统一成小写(`<!DOCTYPE HTML>` → `<!doctype HTML>`,与 templ 的 `writeDocType` 一致),值原样保留。改动波及 `parser/pkg.generated.mbti` 与 3 处测试字面量。
   - 端到端实测:写一个带 `<!DOCTYPE html>` 与 `<!-- the greeting -->` 的真实页面走一遍 CLI,产物 HTML 逐字节正确(临时文件已移走)。
   - 遗留:这次顺带发现产物**不是** `moon fmt` 的不动点(超 80 列的 `write_string` 会被折行),已拆成 T2.19。
-- [ ] **T2.19** 把生成产物排除出 `moon fmt`,并更正 T2.16 记错的那条结论 — `moon fmt` **折行阈值实测为 80 列**(80 列不动、81 列折行,缩进 2 与 6 都一致),所以只要字面量或抄进来的表达式够长,产物就会被重排;T2.16 写的"产物是 `moon fmt` 的不动点"是**错的**,而抄进产物的表达式长度由用户决定,靠构造不可能补全这个保证。正解是在用户包的 `moon.pkg` 里写 `formatter(ignore: ["*_templ.mbt"])`(**已实测有效**)。需要:更正 port-research §6.1、更正 TASKS.md 里 T2.15/T2.16 的相应措辞、把这条写进 `examples/hello/moon.pkg` 与 README · 前置 T2.17 · S
+- [x] **T2.19** 把生成产物排除出 `moon fmt`,并更正 T2.16 记错的那条结论 — `moon fmt` **折行阈值实测为 80 列**(80 列不动、81 列折行,缩进 2 与 6 都一致),所以只要字面量或抄进来的表达式够长,产物就会被重排;T2.16 写的"产物是 `moon fmt` 的不动点"是**错的**,而抄进产物的表达式长度由用户决定,靠构造不可能补全这个保证。正解是在用户包的 `moon.pkg` 里逐个文件写 `formatter(ignore: ["hello_templ.mbt"])`(**已实测有效**;本条原写的是 `"*_templ.mbt"` 这种 glob 写法,**实测无效**,已改)。需要:更正 port-research §6.1、更正 TASKS.md 里 T2.15/T2.16 的相应措辞、把这条写进 `examples/hello/moon.pkg` 与 README · 前置 T2.17 · S
+  - 触发与阈值都是测出来的,不是推的:构造一组只差字面量长度的 `w.write_string("aaa…")`,在**缩进 2 空格**下 80 列不动、81 列折行;在**缩进 6 空格**下分界同样是 80/81 —— 说明判据只看到底有几列,与缩进层级无关。真实场景复现:一个带 `<!DOCTYPE html>` 与正文的页面走完 CLI,产物的 `w.write_string(...)` 被折成三行。
+  - **为什么不去补这个保证**:折行的另一半触发源是**抄进产物的用户表达式**(`{ some_long_call(a, b, c) }` 原样进产物),它的长度生成器管不着。要么内联 formatter(T2.16 已否决,版式对不上),要么就是排除。所以补字面量切分只能修一半,不值得引入一个写死 80 这种魔数的逻辑。
+  - **`formatter(ignore:)` 的两个实测结论**:有效 —— 列进去的文件原样不动;**不支持 glob** —— 写 `"*_templ.mbt"` 那个文件照样被格式化。所以每个生成文件都得单列一行(与 §3.3 里 `pre-build` 的 `input` 是同一个痛点)。
+  - 落点:`examples/hello/moon.pkg` 加上 `formatter(ignore: ["hello_templ.mbt"])`,这是用户会照抄的样板;port-research §6.1 整段改写,§3.3 与风险表同步纠正;TASKS.md 里 T2.15/T2.16 两条断言"不动点"的措辞一并改掉。
+  - README 部分**留给 T5.5**:当前 `README.md` / `README.mbt.md` 只有一行标题,写文档是 T5.5 的整块工作,不在这里顺手起个头。
 - [x] **T2.18** 大写模板名生成非法 MoonBit — 生成期明确报错,templ 侧允许 `templ Hello()` 而 MoonBit 的 `fn` 名必须小写写起。**实测证据**:`templ Hello()` 产出 `pub fn Hello() -> Unit` → `Parse error, unexpected token `(`, you may expect `::``;带接收者的 `templ (m : Model) Render()` 产出 `pub fn Model::Render(...)` → `Expected lower case identifier for name of `fn``。报错要指出是模板名的大小写问题并给出模板名与位置,不要让它变成用户看不懂的产物编译错误 · 前置 T2.15 · S
   - 新增 `Generator::check_name`,在 `write_template` 一开头、**写任何东西之前**调用(所以报错里的名字就是源码里的那个,不会指向半成品产物)。判据是**首字符必须是 `a`–`z` 或 `_`**,与实测一致:`pub fn _leading()` / `pub fn foo_bar()` / `pub fn fooBar2()` 都合法,`pub fn Hello()` 与 `pub fn 9lives()` 都是 parse error(MoonBit 解析器把首字母大写当类型名)。名字**中间**的大写不管。
   - 报错文案:`a template name must start with a lowercase letter or `_`, because it becomes a MoonBit function name, but this one is `Hello` (in template `Hello`)`。带接收者的模板走同一条规则(方法名同样不能大写)。

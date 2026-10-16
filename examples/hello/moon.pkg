@@ -2,4 +2,6 @@ import {
   "daqing/moon-templ/runtime" @rt,
 }
 
+formatter(ignore: [ "hello_templ.mbt" ])
+
 pkgtype(kind: "executable")

@@ -394,7 +394,7 @@ options(
 | 产物放在 package 目录外 | ❌ 被拒绝 |
 | `dev_build` 省略 `input` | ❌ 报 `data did not match any variant of untagged enum MoonPkgGenerate` |
 
-**`formatter(ignore: [...])` 是配套项:** 把生成产物排除出 `moon fmt`。不过按 §6.1 的结论,生成侧的产物本来就是 `moon fmt` 的不动点,`moon fmt` 不会改动它,所以这条从"必需"降为"用户可选的额外保险" —— 真正该守的是产物格式本身,而不是把产物藏起来。
+**`formatter(ignore: [...])` 是必需的配套项:** 把生成产物排除出 `moon fmt`。产物再怎么写也只能**贴近** `moon fmt` 的版式 —— 实测它会把超过 80 列的行折行,而抄进产物的表达式有多长由用户决定,靠构造保证不了(T2.19 更正了早先"产物就是不动点"的说法,详见 §6.1)。注意这条**只认精确文件名、不支持 glob**,每个生成文件都要单列一行。
 
 **⚠️ 唯一的 DX 痛点:** `input` 必须逐文件显式列出(不支持目录/glob,目录形式的行为不可靠)。每新增一个 `.templ` 都要改 `moon.pkg`。这是相对 templ 的实质性退步。
 
@@ -573,11 +573,11 @@ moon-templ/                      # 本仓库(monorepo,三个 module 或一个 mo
   }
   ```
   消耗完直接返回剩余 view,不需要手工递增 `pos`,也不用 `has_prefix` + 算偏移。templ 的每节点一个独立 parser + 有序分派表的结构可以原样保留。
-- **生成后调 `@fmt.format` 规范化。**(`moonbitlang/parser/fmt`)实测能把乱写的源码规范成标准格式并自动补 `///|` 块分隔,让产物读起来跟手写的一样。**但 T2.16 实测后决定不做,理由见 §6.1。**
+- **生成后调 `@fmt.format` 规范化。**(`moonbitlang/parser/fmt`)实测能把乱写的源码规范成标准格式并自动补 `///|` 块分隔,让产物读起来跟手写的一样。**但 T2.16/T2.19 实测后决定不做**,理由见 §6.1。
 
 ---
 
-### 6.1 产物格式化:T2.16 决定不内联 `@fmt.format`(实测)
+### 6.1 产物格式化:不内联 `@fmt.format`,改为排除出 `moon fmt`(实测)
 
 原计划是生成后调 `moonbitlang/parser/fmt` 的 `@fmt.format(src)` 把产物规范一遍(templ 生成后调 `gofmt` 的对应物)。**T2.16 实测后否决了这条路**,依据如下(全部可复现):
 
@@ -586,9 +586,23 @@ moon-templ/                      # 本仓库(monorepo,三个 module 或一个 mo
 3. 也就是说这条链上的 `@fmt.format` **比工具链里的 `moon fmt` 旧**,两版 formatter 对同一份源码的"标准格式"并不一致。内联它等于主动生成一个 `moon fmt` 立刻要重写的文件 —— 用户仓库里 `git diff` 全是噪音,而且会当场把 T2.15 的漂移护栏弄红(护栏比对的是逐字节相等)。
 4. 附带成本:`moonbitlang/parser/fmt` 的 README 自标 "highly experimental and work in progress"(注释格式、空行感知两项状态未打勾),依赖树也不小(x、lexer、moon_config、async、prettyprinter)。
 
-**采纳的判据因此换成"产物是 `moon fmt` 的不动点"**,而不是"产物经过某个 formatter"。这条不需要新依赖就能守:生成侧靠构造保证(见 §3.2.1 与 T2.15:元素嵌套不推语句层级,只有块才推),验证侧由 T2.15 的漂移护栏兜住 —— 产物一旦被 `moon fmt` 改写,护栏立刻变红。`///|` 块分隔由 `write_template` 自己发,实测 `moon fmt` 保持不变。
+**采纳的判据因此换成"产物要贴着 `moon fmt` 的版式写"**,而不是"产物经过某个 formatter":生成侧靠构造保证(见 §3.2.1 与 T2.15:元素嵌套不推语句层级,只有块才推;`///|` 分隔由 `write_template` 自己发),这样产物读起来跟手写的一样。
 
-等 T3.x 引入 `if`/`for` 这些真正的嵌套块、靠构造维持不动点不再划算时,再回来评估内联 formatter(届时要先确认所用版本与工具链的 `moon fmt` 一致)。
+**但"产物是 `moon fmt` 的不动点"这个更强的说法站不住(T2.19 实测更正)。** `moon fmt` 会把**超过 80 列的行折成多行**:
+
+- 阈值实测:缩进 2 的空格下,行宽 80 列不动、81 列折行;缩进 6 时空格下同样 80/81 分界,与缩进无关,只看最终列数。
+- 触发条件是**产物里出现长字面量或长表达式**:把一个真实页面(带 `<!DOCTYPE html>` 与一段正文)走完 CLI,产物的 `w.write_string("...")` 那一行被折成了三行。
+- 长**表达式**是用户写的(`{ some_long_call(a, b, c) }` 原样抄进产物),长度不受生成器控制,所以"靠构造保证不动点"**不可能补齐** —— 除非内联 formatter,而那正是上面被否决的路。
+
+**正解是在用户包里把产物排除出 `moon fmt`**(templ 的产物也不参与手写代码的格式化):
+
+```
+formatter(ignore: ["hello_templ.mbt"])
+```
+
+实测确认两点:**这条有效**(被列出的文件原样不动);**只认精确文件名,不支持 glob** —— 写 `"*_templ.mbt"` 完全不起作用,那个文件照样被格式化。所以每个生成出来的文件都要单独列一行,和 §3.3 里 `pre-build` 的 `input` 是同一个 DX 痛点。
+
+等 T3.x 引入 `if`/`for` 这些真正的嵌套块时,可以顺带评估内联 formatter(届时要先确认所用版本与工具链的 `moon fmt` 一致,否则等于换了一个版式)。在那之前,"产物贴着 `moon fmt` 版式写 + 用 `formatter(ignore:)` 排除"是并存的两条:前者让产物可读,后者保证 `moon fmt` 不重排它。
 
 ---
 
@@ -624,7 +638,7 @@ moon-templ/                      # 本仓库(monorepo,三个 module 或一个 mo
 | `moon fmt` 重排产物 | 每次格式化都改生成文件,git diff 变噪音 | 用 `formatter(ignore: [...])` 排除产物(实测有效) |
 | 空白归一化 | templ 最复杂、最易错的部分(块级元素判定、`SpaceVertical`→单空格降级) | 移植 templ 的 golden 测试目录作为基线 |
 | 表达式边界扫描 | `{ expr }` 要正确处理嵌套括号、字符串、注释、rune | 整体移植 `expressionparser.go`(约 200 行) |
-| 无 `gofmt` 等价物 | templ 生成后调 `gofmt` 保证产物合法格式 | 已解决,但**不走 `@fmt.format`**:T2.16 实测 `moonbitlang/parser/fmt` 这版的版式与工具链 `moon fmt` 不一致(它格式化过的产物会被 `moon fmt` 再改回去),内联反而制造 diff 噪音。改为要求**产物是 `moon fmt` 的不动点**,由生成侧构造保证 + T2.15 的漂移护栏守(见 §6.1)。`formatter(ignore:)` 仍可作为用户侧的额外保险 |
+| 无 `gofmt` 等价物 | templ 生成后调 `gofmt` 保证产物合法格式 | 不去配一个 formatter,而是让产物**贴着 `moon fmt` 的版式**生成,再用 `formatter(ignore: [...])` 把产物排除掉(T2.19)。`@fmt.format` 这条路已实测否决 —— 其版式与工具链的 `moon fmt` 不一致,内联等于换个版式(见 §6.1) |
 | 生态差异 | MoonBit 无 `net/http`,渲染目标不是 HTTP handler | 聚焦 `String` / `&Logger` 输出,Web 集成留给上层框架 |
 
 **未能确认的点:**
