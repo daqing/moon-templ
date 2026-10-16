@@ -1,1 +1,4 @@
-
+import {
+  "daqing/moon-templ/parser",
+  "moonbitlang/core/debug",
+}

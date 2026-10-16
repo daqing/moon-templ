@@ -1,12 +1,40 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "daqing/moon-templ/generator"
 
+import {
+  "daqing/moon-templ/parser",
+  "moonbitlang/core/debug",
+}
+
 // Values
+pub fn generate(@parser.TemplateFile) -> GeneratedFile raise GenerateError
+
 pub fn string_literal(String) -> String
 
 // Errors
+pub(all) suberror GenerateError {
+  GenerateError(message~ : String)
+} derive(Eq, @debug.Debug)
+pub fn GenerateError::equal(Self, Self) -> Bool
+pub fn GenerateError::not_equal(Self, Self) -> Bool
+pub fn GenerateError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
+pub(all) struct GeneratedFile {
+  source : String
+  literals : Array[String]
+} derive(Eq, @debug.Debug)
+pub fn GeneratedFile::equal(Self, Self) -> Bool
+pub fn GeneratedFile::not_equal(Self, Self) -> Bool
+pub fn GeneratedFile::to_repr(Self) -> @debug.Repr
+
+pub struct Generator {
+  // private fields
+}
+pub fn Generator::literals(Self) -> Array[String]
+pub fn Generator::new(&Logger) -> Self
+pub fn Generator::next_var(Self) -> String
+
 pub struct RangeWriter {
   // private fields
 }

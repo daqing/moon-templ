@@ -338,6 +338,9 @@ pub fn layout(title : String) -> @rt.Component {
 | `unused_value` | children 前导里的 `let children = ctx.children`,但模板没用到它 | 按上表分级发射(见 §3.2);别为了图省事无脑照抄前导 |
 | `implicit_impl_as_method` | runtime 里 `impl Show for Component` 的 `to_string`/`output` 被隐式提升,已废弃 | runtime 补 `pub extend Component with Show::{to_string, output}` |
 | `deprecated` | `StringBuilder::new()` | 用 `StringBuilder()` |
+| `unused_value` | **模板声明了但正文没用到的参数**(Go 只对局部变量报警,函数参数不报) | 待定,见下 |
+
+最后一条是 T2.9 实测新发现的:`templ foo(x : Int) { <p>hi</p> }` 生成出来的 `pub fn foo(x : Int)` 会因为 `x` 未被使用而报警。Go 只在函数体内报未使用的局部变量,参数不管,所以 templ 没有这个问题,照搬会踩到。两条候选对策——正文开头发 `ignore(x)`,或把参数改名成 `_: Int`——前者保住具名调用(`foo(x=1)`)和签名可读性,倾向选它,**留到 T2.16 定案**(那时有 `@fmt.format` 和产物快照可以一起验证)。
 
 这条对 `moon-templ` 是个硬要求:**产物是给用户编译的,必须 warning-clean**。建议把"生成产物零警告"作为 CI 门禁。
 
