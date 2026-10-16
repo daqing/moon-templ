@@ -6,6 +6,12 @@ import {
 }
 
 // Values
+pub fn is_block_element(String) -> Bool
+
+pub fn is_inline(Node) -> Bool
+
+pub fn normalize_whitespace(Array[Node]) -> Array[Node]
+
 pub fn parse_attributes(StringView, Int) -> (Array[Attribute], StringView, Bool) raise ParseError
 
 pub fn parse_nodes(StringView, Int, (StringView) -> Bool) -> (Array[Node], StringView) raise ParseError

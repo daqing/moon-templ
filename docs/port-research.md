@@ -418,6 +418,38 @@ moon build                    # 普通编译,零配置
 | 宏 | **不存在**(实测四路排查:`macro` 只是保留字、官方文档无相关页、`moon explain --attribute` 无相关属性、编译器无对应 `-Z` flag) → 架构上排除宏方案 |
 | CLI 所需能力 | ✅ 进例已用 `moonbitlang/core/env`(`@env.args()`) + `moonbitlang/x/fs` |
 
+### 3.6 空白归一化的确切规则(已用 748 组差分用例对齐)
+
+templ 的空白处理没有写在文档里,只能从 `parser/v2` + `generator/generator.go` 反推。**不要靠猜**:下面的规则是把 templ 自己的 parser+generator 编成一个探针程序(见 §3.6.1),对同一批输入跑出产物字面量、再逐条对齐得到的。
+
+templ 的机制是"**前一个节点吃掉它后面的空白**":能带尾随空白的节点(元素、文本、字符串表达式、组件调用)会把紧随其后的空白消耗成自己的 `TrailingSpace`(`None` / `Horizontal` / `Vertical`);只有在节点列表开头没人可吃时,空白才会变成一个 `Whitespace` 节点,而它在列表首尾会被 `stripLeadingAndTrailingWhitespace` 丢掉。生成时,只有"当前节点和下一个节点都是行内内容"才写出一个空格(`SpaceVertical` 也归一成一个空格)。
+
+移植到 moon-templ(我们的 parser 把一整段文本收成一个 `Text` 节点,不像 templ 那样在换行处切断),等价规则是 —— 对每个 `Text` 的值切分成 `Literal` / `Gap` 两种片段:
+
+| 片段 | 处理 |
+|---|---|
+| 行内(不含换行的)空白,且两侧在本段文本内都有非空白字符 | **原样保留**(`a   b` → `a   b`) |
+| 文本节点开头的空白整段 | `Gap`(它属于上一个节点的尾随空白) |
+| 含换行的空白,从**第一个换行**起到该段空白结束 | `Gap`;第一个换行**之前**的水平空白原样保留 |
+| 输出时 `Gap` | 前后都是行内内容 → 一个空格;否则整个删掉(列表首尾天然删掉) |
+
+行内内容 = `Text` / 字符串表达式 / 控制流 / 非块级元素;块级元素名单照抄 templ 的 `blockElements`(含 `td` `th` `tr` `br` `title` `style` `link` 这几个"为了排版当块级看"的)。
+
+几条实测反例(都进了差分表),容易想当然写错:
+
+| 输入 | templ 产物 | 说明 |
+|---|---|---|
+| `<div> text</div>` | `<div>text</div>` | 列表开头的空白被丢 |
+| `<p>a  </p>` | `<p>a  </p>` | 文本**尾部**的水平空白原样保留 |
+| `<p>a \n b</p>` | `<p>a  b</p>` | 换行前那个空格属于上一行,保留;换行起归一成第二个空格 |
+| `<div>a <p>b</p></div>` | `<div>a <p>b</p></div>` | 空格在 `<p>` 前、属于文本值,保留(即使 `p` 是块级) |
+| `<div><p>a</p> b</div>` | `<div><p>a</p>b</div>` | 空格在 `</p>` 后、算 `p` 的尾随空白,块级 → 丢 |
+| `<span>a</span>  <span>b</span>` | `<span>a</span> <span>b</span>` | 独立空白节点无论多长都归一成一个空格 |
+
+#### 3.6.1 差分测试怎么复现
+
+`parser/whitespace_golden_test.mbt` 的 748 条断言不是手写的,是用临时 Go 探针跑 templ **自己的** `parser.ParseString` + `generator.Generate`、取 `GeneratorOutput.Literals` 拼起来生成的(注意 `escapeQuotes` 用的是 Go 源码转义,要 `strconv.Unquote` 还原成运行时值)。要重跑或扩充:建一个临时 module,`require github.com/a-h/templ v0.3.1070`,按上面的方式导出即可。这套办法在任何"行为只能靠反推"的地方都值得再用一次。
+
 ---
 
 ## 4. 语法映射表(templ → moon-templ)
