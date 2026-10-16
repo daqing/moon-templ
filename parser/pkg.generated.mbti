@@ -35,6 +35,7 @@ pub fn ParseError::to_repr(Self) -> @debug.Repr
 // Types and methods
 pub(all) enum Attribute {
   Constant(name~ : String, value~ : String)
+  Expression(name~ : String, value~ : String)
   Bool(name~ : String)
 } derive(Eq, @debug.Debug)
 pub fn Attribute::equal(Self, Self) -> Bool

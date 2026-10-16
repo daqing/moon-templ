@@ -55,6 +55,24 @@ test "raw bypasses escaping" {
 }
 
 ///|
+/// An attribute value sits inside double quotes in the HTML, so both quote
+/// characters have to survive as text: the `"` because it would end the value,
+/// the `'` because it may sit inside one.
+test "resolve_attribute_value escapes for a double-quoted attribute" {
+  assert_eq(@runtime.resolve_attribute_value("a<b"), "a&lt;b")
+  assert_eq(@runtime.resolve_attribute_value("\""), "&#34;")
+  assert_eq(@runtime.resolve_attribute_value("'"), "&#39;")
+  assert_eq(@runtime.resolve_attribute_value("a&b"), "a&amp;b")
+}
+
+///|
+test "resolve_attribute_value takes any Show value" {
+  assert_eq(@runtime.resolve_attribute_value(42), "42")
+  assert_eq(@runtime.resolve_attribute_value(true), "true")
+  assert_eq(@runtime.resolve_attribute_value(1.5), "1.5")
+}
+
+///|
 test "children render where the component asks for them" {
   let leaf = @runtime.component(fn(_ctx, w) { w.write_string("LEAF") })
   let wrapper = @runtime.component(fn(ctx, w) {

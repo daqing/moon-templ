@@ -8,6 +8,8 @@ pub fn escape(String) -> String
 
 pub fn raw(String) -> Component
 
+pub fn[T : Show] resolve_attribute_value(T) -> String
+
 pub fn[T : Show] write_any(&Logger, T) -> Unit
 
 pub fn write_escaped(&Logger, String) -> Unit

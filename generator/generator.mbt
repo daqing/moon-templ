@@ -259,8 +259,28 @@ fn mentions_in(nodes : Array[@parser.Node], name : String) -> Bool {
         if mentions(expr[:], name[:], None) {
           return true
         }
-      Element(element) => if mentions_in(element.children, name) { return true }
-      RawElement(_) | Text(_) | HTMLComment(_) | DocType(_) => ()
+      Element(element) =>
+        if mentions_in_attrs(element.attrs, name) ||
+          mentions_in(element.children, name) {
+          return true
+        }
+      RawElement(raw) => if mentions_in_attrs(raw.attrs, name) { return true }
+      Text(_) | HTMLComment(_) | DocType(_) => ()
+    }
+  }
+  false
+}
+
+///|
+/// Whether any `name={ expr }` attribute reads `name`.
+fn mentions_in_attrs(attrs : Array[@parser.Attribute], name : String) -> Bool {
+  for attr in attrs {
+    match attr {
+      Expression(value~, ..) =>
+        if mentions(value[:], name[:], None) {
+          return true
+        }
+      Constant(_) | Bool(_) => ()
     }
   }
   false
@@ -384,7 +404,7 @@ fn Generator::write_raw_element(
   self : Generator,
   raw : @parser.RawElement,
   level : Int32,
-) -> Unit {
+) -> Unit raise GenerateError {
   self.write_open_tag(raw.name, raw.attrs, level)
   self.w.write_literal(level, raw.contents)
   self.w.write_literal(level, "</" + raw.name + ">")
@@ -396,7 +416,7 @@ fn Generator::write_open_tag(
   name : String,
   attrs : Array[@parser.Attribute],
   level : Int32,
-) -> Unit {
+) -> Unit raise GenerateError {
   self.w.write_literal(level, "<" + name)
   for attr in attrs {
     self.write_attribute(attr, level)
@@ -412,14 +432,55 @@ fn Generator::write_attribute(
   self : Generator,
   attr : @parser.Attribute,
   level : Int32,
-) -> Unit {
+) -> Unit raise GenerateError {
   match attr {
     Constant(name~, value~) => {
       let quote = if value.contains("\"") { "'" } else { "\"" }
       self.w.write_literal(level, " " + name + "=" + quote + value + quote)
     }
+    Expression(name~, value~) =>
+      self.write_expression_attribute(name, value, level)
     Bool(name~) => self.w.write_literal(level, " " + name)
   }
+}
+
+///|
+/// An expression attribute is written as the escaped value of the expression,
+/// inside quotes the generator emits itself. The runtime escapes it, so it goes
+/// out through `write_string` rather than through `write_any`.
+fn Generator::write_expression_attribute(
+  self : Generator,
+  name : String,
+  value : String,
+  level : Int32,
+) -> Unit raise GenerateError {
+  let expr = value.trim().to_owned()
+  if expr.is_empty() {
+    raise GenerateError(
+      message="an expression attribute needs an expression: `" +
+        name +
+        "={ }` (" +
+        self.location() +
+        ")",
+    )
+  }
+  if @parser.holds_multiple_values(expr) {
+    raise GenerateError(
+      message="an attribute with more than one value is not supported yet: `" +
+        name +
+        "={" +
+        expr +
+        "}` (" +
+        self.location() +
+        ")",
+    )
+  }
+  self.w.write_literal(level, " " + name + "=\"")
+  self.w.write_indent(
+    level,
+    "w.write_string(@rt.resolve_attribute_value(" + expr + "))\n",
+  )
+  self.w.write_literal(level, "\"")
 }
 
 ///|

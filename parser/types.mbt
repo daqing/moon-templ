@@ -33,6 +33,8 @@ pub(all) struct RawElement {
 ///|
 pub(all) enum Attribute {
   Constant(name~ : String, value~ : String)
+  /// `name={ expr }`. `value` keeps the source spelling of the expression.
+  Expression(name~ : String, value~ : String)
   Bool(name~ : String)
 } derive(Debug, Eq)
 

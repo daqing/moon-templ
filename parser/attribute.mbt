@@ -87,8 +87,8 @@ fn parse_attribute(
   }
   match after_name {
     ['=', .. rest] => {
-      let (value, after) = parse_attribute_value(rest, offset)
-      (Constant(name~, value~), after)
+      let (attr, after) = parse_attribute_value(rest, name, offset)
+      (attr, after)
     }
     ['?', ..] =>
       raise ParseError(
@@ -102,18 +102,28 @@ fn parse_attribute(
 }
 
 ///|
+/// The value of a `name=...` attribute, whatever form it takes. An expression is
+/// not a value in the AST sense, so the quoted and unquoted forms build a
+/// `Constant` here and the expression form builds an `Expression`, which is how
+/// the generator tells code from text.
 fn parse_attribute_value(
   src : StringView,
+  name : String,
   offset : Int32,
-) -> (String, StringView) raise ParseError {
+) -> (Attribute, StringView) raise ParseError {
   match src {
-    ['"', .. rest] => scan_quoted(rest, '"', offset)
-    ['\'', .. rest] => scan_quoted(rest, '\'', offset)
-    ['{', ..] =>
-      raise ParseError(
-        offset~,
-        message="expression attribute values are not supported yet: name={ ... }",
-      )
+    ['"', .. rest] => {
+      let (value, after) = scan_quoted(rest, '"', offset)
+      (Constant(name~, value~), after)
+    }
+    ['\'', .. rest] => {
+      let (value, after) = scan_quoted(rest, '\'', offset)
+      (Constant(name~, value~), after)
+    }
+    ['{', .. rest] => {
+      let (value, after) = scan_expression(rest, offset)
+      (Expression(name~, value~), after)
+    }
     _ => {
       let buf = StringBuilder()
       let rest = take_unquoted(src, buf)
@@ -121,7 +131,7 @@ fn parse_attribute_value(
       if value.is_empty() {
         raise ParseError(offset~, message="expected attribute value")
       }
-      (value, rest)
+      (Constant(name~, value~), rest)
     }
   }
 }

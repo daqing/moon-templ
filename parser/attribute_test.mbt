@@ -98,12 +98,50 @@ test "an empty value is an error" {
 }
 
 ///|
-test "expression attribute values are rejected for now" {
+fn expression(name : String, value : String) -> @parser.Attribute {
+  Expression(name~, value~)
+}
+
+///|
+test "expression attribute value" {
+  assert_eq(attrs_of("<div a={ x }></div>"), [expression("a", " x ")])
+}
+
+///|
+test "expression attribute value keeps the expression verbatim" {
+  assert_eq(attrs_of("<div a={ f(\"}\", 1) }></div>"), [
+    expression("a", " f(\"}\", 1) "),
+  ])
+  assert_eq(attrs_of("<div a={ x }b={ y }></div>"), [
+    expression("a", " x "),
+    expression("b", " y "),
+  ])
+}
+
+///|
+test "expression attribute values mix with the other forms" {
+  assert_eq(attrs_of("<input type=\"text\" value={ v } disabled>"), [
+    constant("type", "text"),
+    expression("value", " v "),
+    Bool(name="disabled"),
+  ])
+}
+
+///|
+test "an unterminated expression attribute value is an error" {
   assert_eq(
-    error_of("<div a={ x }></div>"),
+    error_of("<div a={ x ></div>"),
+    @parser.ParseError(offset=0, message="unterminated expression"),
+  )
+}
+
+///|
+test "boolean expression attributes are still rejected" {
+  assert_eq(
+    error_of("<div a?={ x }></div>"),
     @parser.ParseError(
       offset=0,
-      message="expression attribute values are not supported yet: name={ ... }",
+      message="boolean expression attributes are not supported yet: a?={ ... }",
     ),
   )
 }
