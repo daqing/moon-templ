@@ -1,0 +1,23 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "daqing/moon-templ/golden/style"
+
+import {
+  "daqing/moon-templ/runtime",
+}
+
+// Values
+pub fn button(String, String) -> @runtime.Component
+
+pub fn button_trusted(@runtime.SafeCSS, String) -> @runtime.Component
+
+pub fn button_with(@runtime.Style, String) -> @runtime.Component
+
+pub fn get_function_result() -> String
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

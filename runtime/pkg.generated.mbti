@@ -14,6 +14,8 @@ pub fn[A : Attributer] render_attributes(&Logger, A) -> Unit
 
 pub fn[T : Show] resolve_attribute_value(T) -> String
 
+pub fn[A : Stylable] sanitize_style_attribute_value(A) -> String
+
 pub fn[T : Show] write_any(&Logger, T) -> Unit
 
 pub fn write_escaped(&Logger, String) -> Unit
@@ -71,9 +73,39 @@ pub fn RenderCtx::clear_children(Self) -> Self
 pub fn RenderCtx::new() -> Self
 pub fn RenderCtx::with_children(Self, Component) -> Self
 
+pub(all) struct SafeCSS {
+  // private fields
+}
+pub fn SafeCSS::new(String) -> Self
+pub fn SafeCSS::sanitized(Self) -> String
+pub impl Stylable for SafeCSS
+
+pub(all) struct Style {
+  // private fields
+}
+pub fn Style::from_map(Map[String, String]) -> Self
+pub fn Style::from_trusted_map(Map[String, SafeCSS]) -> Self
+pub fn Style::new(Array[StylePart]) -> Self
+pub fn Style::sanitized(Self) -> String
+pub impl Stylable for Style
+
+pub(all) enum StylePart {
+  Text(String)
+  Trusted(SafeCSS)
+  Property(KV[String, String])
+  TrustedProperty(KV[String, SafeCSS])
+  Toggle(KV[String, Bool])
+  TrustedToggle(KV[SafeCSS, Bool])
+}
+
 // Type aliases
 
 // Traits
 pub(open) trait Attributer {
   fn items(Self) -> Array[KV[String, AttributeValue]]
 }
+
+pub(open) trait Stylable {
+  fn sanitized(Self) -> String
+}
+pub impl Stylable for String

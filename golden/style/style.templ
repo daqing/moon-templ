@@ -1,0 +1,12 @@
+templ button(style : String, text : String) {
+  <button style={ style }>{ text }</button>
+  <button style={ get_function_result() }>{ text }</button>
+}
+
+templ button_with(style : @rt.Style, text : String) {
+  <button style={ style }>{ text }</button>
+}
+
+templ button_trusted(style : @rt.SafeCSS, text : String) {
+  <button style={ style }>{ text }</button>
+}

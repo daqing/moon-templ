@@ -823,9 +823,22 @@ fn Generator::write_expression_attribute(
   self.w.write_literal(level, " " + name + "=\"")
   self.w.write_indent(
     level,
-    "w.write_string(@rt.resolve_attribute_value(" + expr + "))\n",
+    "w.write_string(@rt." + attribute_value_call(name) + "(" + expr + "))\n",
   )
   self.w.write_literal(level, "\"")
+}
+
+///|
+/// The call an expression attribute's value goes through. Only `style` has one
+/// of its own: templ sanitizes the value of a style attribute, and picks between
+/// the sanitizer and the plain escape by the name of the attribute — matched
+/// exactly, so a `STYLE` attribute is escaped like any other.
+fn attribute_value_call(name : String) -> String {
+  if name == "style" {
+    "sanitize_style_attribute_value"
+  } else {
+    "resolve_attribute_value"
+  }
 }
 
 ///|

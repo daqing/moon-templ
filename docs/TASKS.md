@@ -4,7 +4,7 @@
 拆分日期:2026-10-17
 目标:把 `a-h/templ` 的模板引擎在 MoonBit 中重新实现
 
-**进度:43 / 58**
+**进度:44 / 58**
 
 ---
 
@@ -19,7 +19,7 @@
   | T1 runtime 地基 | 5 | 5 | 0 |
   | T2 parser + generator 骨架 | 19 | 19 | 0 |
   | T3 MVP 完整 | 11 | 11 | 0 |
-  | T4 属性特殊语义 | 8 | 3 | 0 |
+  | T4 属性特殊语义 | 8 | 4 | 0 |
   | T5 工具链与打磨 | 5 | 0 | 1(T5.2) |
   | T6 可选 / 远期 | 5 | 0 | 3 |
 
@@ -170,9 +170,9 @@
 > templ 对四类属性有超出"输出键值对"的特殊处理(port-research §1.2)。这一阶段把语义补齐。
 
 - [x] **T4.1** runtime:`Attributes` / `RenderAttributes` — 单测:map 与 KV 数组两种输入 · 前置 T1.1 · M
-  - **MoonBit 不允许给"不属于本包的类型"实现 trait。** 实测(临时建两个包:A 定义 `pub(open) trait T`,并 `impl T for Map[String, Int]` / `impl T for Array[String]`;B 调 `@a.use_it(m)`):两个 impl 都只报 `Unused trait implementation`,B 侧是 `Type Map[String, Int] does not implement trait ...: no ``impl`` is defined`。也就是说 templ 那种"`Attributes`(map)与 `OrderedAttributes`(slice)各实现一次 `Attributer`"的写法在这里编译不出来 —— `Map` 属于 core,`Array` 是内建类型。
+  - **【T4.4 更正】本条原先写的"MoonBit 不允许给不属于本包的类型实现 trait"是错的。** 当时临时建两个包(A 定义 `pub(open) trait T`,并 `impl T for Map[String, Int]` / `impl T for Array[String]`,**没带 `pub`**;B 调 `@a.use_it(m)`)只看到 `Unused trait implementation` / `no ``impl`` is defined`,于是归因到"类型归属"上,但真正起作用的是 `pub`:T4.4 里 `runtime` 就有 `pub impl Stylable for String`(`String` 是内建类型,不是本包类型),`.mbti` 里照样看得到;同一形状的探针(A 里 `pub impl T for Map[String, String]` / `pub impl T for Array[String]`,B 用 `@a.render(...)` 走 `[A : T]` 泛型调用)也编译通过、断言通过。**结论:`Map` / `Array` / `String` 这些都能实现本包的 trait,绊住当时的只是漏写 `pub`。**
   - 形状据此改:两种输入合成**一个** `Attributes` 结构(内部 `priv items : Array[KV[String, AttributeValue]]`),由两个构造器给出 —— `from_map`(按名排序,对齐 templ 的 map)与 `ordered`(保持给定顺序,对齐 templ 的 OrderedAttributes)。`Attributer` trait 仍然保留,但只对我们自己的类型实现;`pub(open)` 让调用方还能给自己的类型实现它,自定义属性来源的路没堵死。
-  - **`pub impl` 与 `impl` 的差别是实测出来的**:`impl Attributer for Attributes`(不带 `pub`)一样被报 `Unused trait implementation`,下游也看不见;加上 `pub` 才对下游可用。这条对任何"要给下游用的 trait impl"都成立。
+  - **`pub impl` 与 `impl` 的差别是实测出来的**:`impl Attributer for Attributes`(不带 `pub`)一样被报 `Unused trait implementation`,下游也看不见;加上 `pub` 才对下游可用。这条对任何"要给下游用的 trait impl"都成立 —— 也解释了上一条的误判。**把两种输入合成一个 `Attributes` 结构的形状仍然保留**(templ 的 `Attributes` 与 `OrderedAttributes` 是两个来源,合成一个结构配两个构造器更简单),但它不是语言逼出来的,`pub(open)` 的 trait 照样允许调用方给自己的类型实现。
   - **`typealias` 是 `.mbti` 的关键字,源码里要写 `pub type`**:写 `pub typealias` 直接 parse error(`unexpected token id`)。
   - **泛型函数的类型参数写在名字前面**:`pub fn[A : Attributer] render_attributes(...)`;写成 `fn f[T](...)` 报 `unexpected ``fn f[T]``, you may expect ``fn[T] f```。
   - 动态类型没有了:`map[string]any` 上的 switch 换成 `AttributeValue` 的三个变体 `Value(String)` / `Flag(Bool)` / `Conditional(KV[String, Bool])`。templ 的 `*string`、`*bool`、`func() bool` 三种情形在这里落在 `Value` / `Flag` 上(空指针等于"不出现",`func() bool` 由调用方求值),理由是没有 `any` 就没有运行期分派。
@@ -195,7 +195,18 @@
   - 顺带钉住一条容易误解的边界:`class={ "a  b" }`(裸字符串表达式)**不消空白** —— templ 里字符串整体算**一个**类名(`cp.AddClassName(c, true)`,不切),空格是它自己的。所以"消空白"是**常量值**的规则,不是"名字叫 class"的规则;有单测。
   - golden:`golden/class/` 移植 templ 的 `generator/test-class-whitespace`(6 个模板 + `test_component`),模板名按 T2.18 转 snake_case。逐条对过:`templ@v0.3.1070/generator/test-class-whitespace/template_templ.go` 里那 6 行 `WriteString` 与我们的 `class_templ.mbt` 逐字相同。另加两个 gold 里没有的模板(`expression_class_list` / `expression_string_is_one_name`)补表达式那一侧 —— 原 golden 只有常量,不然这半条任务没有端到端覆盖。已在 `cli/checked_in_wbtest.mbt` 的 `checked_in_templates()` 登记(否则"树里每个模板都被检查过"那条会红)。
   - `moon check` 零警告;`moon test` **340 passed / 0 failed**(较 T4.2 的 334 多出 6:生成器 3 + golden 3)。
-- [ ] **T4.4** `style` 属性 sanitize — 对 templ golden 校验 · 前置 T4.1 · M
+- [x] **T4.4** `style` 属性 sanitize — 对 templ golden 校验 · 前置 T4.1 · M
+  - 生成器只改**一行**:表达式属性那个调用名改由 `attribute_value_call(name)` 给 —— `style` 走 `@rt.sanitize_style_attribute_value`,其余走 `@rt.resolve_attribute_value`。templ 就是按属性名**精确匹配**选的(`generator.go` 里 `name == "style"` 才包 `SanitizeStyleAttributeValues`),不折叠大小写,所以 `STYLE={ s }` 仍然走普通转义;有单测钉住两个名字各走哪条。
+  - **常量属性与散列属性故意不 sanitize**:templ 的 `writeConstantAttribute` 只特判 `class`,`RenderAttributes` 里没有任何按名分派,两边都是原样输出。
+  - `style={ ... }` 的取值面按 templ 的 `SanitizeStyleAttributeValues(values ...any)` 铺开。它那个 `switch value.(type)` 认得字符串、`templ.SafeCSS`、`map[string]string`、`map[string]templ.SafeCSSProperty`、`[]KeyValue[string,string]`、`[]KeyValue[string,bool]`、`[]KeyValue[SafeCSS,bool]`,再加反射那条(切片、`func() string` 之类)。没有 `any` 就没有运行期分派,于是把"值是什么"写进类型:`StylePart` 的六个变体(`Text` / `Trusted` / `Property` / `TrustedProperty` / `Toggle` / `TrustedToggle`),配一个 `Stylable` trait,`String` / `SafeCSS` / `Style` 各实现一次。map 的两个形态由 `Style::from_map` / `Style::from_trusted_map` 给(map 无名序,照 T3.9 用 `lexical_compare` 排),变体数组走 `Style::new`。
+  - sanitize 逐条照搬 templ 的 `sanitize.go`:整串走 `processString`(按 CSS 字符串 token 转义,去首尾空白,补分号),按 `;` 切声明、再按第一个 `:` 分名值。值按属性名有三条专门规则 —— 枚举类属性(如 `display`)走 `sanitizeEnum`,属性名带 `font-family` 的走 `sanitizeFontFamily`,带 `background-image` 的走 `sanitizeBackgroundImage`;其余走 `sanitizeRegular`。属性名统一小写(`COLOR` → `color`,单测钉住)。
+  - `sanitizeRegular` 那张字符类是 `[0-9a-zA-Z+-.!#%_ \t]`,**`+-.` 是范围不是三个字符,所以逗号在集合里** —— templ 源码里那条"逗号会挡掉值"的注释与它自己的正则不符,以正则为准,单测把逗号放行钉住。`*` / `/` 只在不构成注释时放行(`a*`、`*a`、`*` 通过,`**`、`a//b`、`a/*b*/c` 挡掉)。
+  - 挡掉之后不是丢弃而是换成无害值,整条声明也留在输出里好让人看见:值为 `zTemplUnsafeCSSPropertyValue`(`sanitizeCSSValue`),属性名不是合法名字时名与值一起换成 `zTemplUnsafeCSSPropertyName:zTemplUnsafeCSSPropertyValue`(`sanitizeCSSProperty`)。
+  - `urlIsSafe` 是把 Go `url.Parse` 的错误面照搬过来的:`%` 后面不是两个十六进制、控制字符、开头就是 `:`,以及无 scheme 且非根路径时首段里有 `:`(如 `a:b.png`)—— 都算"跟不得"。`background-image` 里出现 `<` / `>` 直接挡掉。
+  - **转义两次是 templ 的行为,不是这里的笔误**:每一片先按 CSS 字符串 token 转义(`</style>` → `\00003C/style`,空字符换成替换字符而不是转义),整个结果再被属性转义一次,所以 `a&b` 出来是 `a&amp;amp;b;`;单测 "the attribute escapes what the sanitizer escaped" 钉住这条。落法:运行时 `sanitize_style_attribute_value(v) = escape(v.sanitized())`,生成器直接 `w.write_string(...)`。
+  - **差分校验**:把 158 个输入(整串、裸串、KV 六种、map 两种、`url(...)` 的各种引号与编码、危险值、边界)同时喂给真 templ(Go,`GOPROXY=off` 走本地模块缓存)与本实现,逐条比对 **158/158 一致**。唯一一次不符是 `url("https://example.com/a.png`(引号不配对),它把我们漏掉的两条检查逼了出来(`%` 转义、首段冒号)。临时语料测试跑完即移走,换成 19 条带注释的单测。
+  - golden:`golden/style/` 移植 `generator/test-style-attribute`。那份 golden 只有**一个泛型模板** `Button[T any]`,被调用七次、每次一种值;本项目的解析器不支持泛型模板(`split_signature` 在模板名后要 `(`,`[` 直接报错),于是拆成三个模板(分别收 `String` / `@rt.Style` / `@rt.SafeCSS`),七种输入各断言一次。golden 的 `expected.html` 是给人看的写法(冒号后带空格、无分号)且走 HTML diff;真实产物已用 Go 探针逐字核对:两个按钮是 `background-color:blue;color:red;` 与 `background-color: red;`(函数返回那条留着空格、再补分号),按这个写进断言。已在 `cli/checked_in_wbtest.mbt` 登记。
+  - `moon check` 零警告;`moon test` **362 passed / 0 failed**(较 T4.3 的 340 多出 22:运行时 19 + 生成器 2 + golden 1)。
 - [ ] **T4.5** URL 白名单:`a[href]` `link[href]` `form[action]` `object[data]` — **故意用 `javascript:` 输入,断言被拦截** · 前置 T4.1 · M
 - [ ] **T4.6** 事件属性 `on*` / `hx-on:*` → `ComponentScript` — 输出 `.Call` 而非转义值 · 前置 T4.1 · M
 - [ ] **T4.7** 布尔表达式属性 `name?={ expr }` — 假值时整个属性消失 · 前置 T3.1 · S
