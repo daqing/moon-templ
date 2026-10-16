@@ -136,6 +136,62 @@ test "an unterminated expression attribute value is an error" {
 }
 
 ///|
+fn spread(value : String) -> @parser.Attribute {
+  Spread(value~)
+}
+
+///|
+test "an attribute spread keeps the expression it spreads" {
+  assert_eq(attrs_of("<div { attrs... }></div>"), [spread("attrs")])
+  assert_eq(attrs_of("<div { self.attrs... }></div>"), [spread("self.attrs")])
+  assert_eq(attrs_of("<div { f(a, b)... }></div>"), [spread("f(a, b)")])
+}
+
+///|
+test "an attribute spread mixes with the other forms" {
+  assert_eq(attrs_of("<div id=\"a\" { attrs... } class={ c }></div>"), [
+    constant("id", "a"),
+    spread("attrs"),
+    expression("class", " c "),
+  ])
+  assert_eq(attrs_of("<div {a...}></div>"), [spread("a")])
+}
+
+///|
+/// The `...` ends the expression rather than the braces, so whitespace may pad it
+/// without changing what it spreads.
+test "an attribute spread trims around the marker" {
+  assert_eq(attrs_of("<div { attrs ... }></div>"), [spread("attrs")])
+  assert_eq(attrs_of("<div {\n  attrs...\n}></div>"), [spread("attrs")])
+}
+
+///|
+test "an attribute spread needs an expression and a marker" {
+  assert_eq(
+    error_of("<div { attrs }></div>"),
+    @parser.ParseError(
+      offset=0,
+      message="an attribute spread needs `...`, as in `{ attrs... }`",
+    ),
+  )
+  assert_eq(
+    error_of("<div { ... }></div>"),
+    @parser.ParseError(
+      offset=0,
+      message="an attribute spread needs an expression: `{ ... }`",
+    ),
+  )
+}
+
+///|
+test "an unterminated attribute spread is an error" {
+  assert_eq(
+    error_of("<div { attrs... ></div>"),
+    @parser.ParseError(offset=0, message="unterminated expression"),
+  )
+}
+
+///|
 test "boolean expression attributes are still rejected" {
   assert_eq(
     error_of("<div a?={ x }></div>"),

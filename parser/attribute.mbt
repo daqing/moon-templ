@@ -71,6 +71,47 @@ fn parse_attribute(
   src : StringView,
   offset : Int32,
 ) -> (Attribute, StringView) raise ParseError {
+  match src {
+    ['{', .. rest] => parse_spread_attribute(rest, offset)
+    _ => parse_named_attribute(src, offset)
+  }
+}
+
+///|
+/// `{ attrs... }`: the rest of the element's attributes come from a value the
+/// template computes. The braces are not part of the expression, so a spread is
+/// read here rather than as a value of some name.
+///
+/// The `...` is what makes it a spread, and it may be padded with whitespace on
+/// either side — what the expression is does not depend on the padding, since the
+/// expression is trimmed either way.
+fn parse_spread_attribute(
+  src : StringView,
+  offset : Int32,
+) -> (Attribute, StringView) raise ParseError {
+  let (text, rest) = scan_expression(src, offset)
+  let spread = trim_space(text)
+  if !spread.has_suffix("...") {
+    raise ParseError(
+      offset~,
+      message="an attribute spread needs `...`, as in `{ attrs... }`",
+    )
+  }
+  let value = trim_space(spread[:spread.length() - 3].to_owned())
+  if value.is_empty() {
+    raise ParseError(
+      offset~,
+      message="an attribute spread needs an expression: `{ ... }`",
+    )
+  }
+  (Spread(value~), rest)
+}
+
+///|
+fn parse_named_attribute(
+  src : StringView,
+  offset : Int32,
+) -> (Attribute, StringView) raise ParseError {
   let name_buf = StringBuilder()
   let after_name = match src {
     [c, ..] if is_attr_name_first(c) => take_attribute_name(src, name_buf)

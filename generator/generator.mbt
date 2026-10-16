@@ -412,7 +412,7 @@ fn match_mentions(expr : @parser.MatchExpression, name : String) -> Bool {
 fn mentions_in_attrs(attrs : Array[@parser.Attribute], name : String) -> Bool {
   for attr in attrs {
     match attr {
-      Expression(value~, ..) =>
+      Expression(value~, ..) | Spread(value~) =>
         if mentions(value[:], name[:], None) {
           return true
         }
@@ -728,8 +728,31 @@ fn Generator::write_attribute(
     }
     Expression(name~, value~) =>
       self.write_expression_attribute(name, value, level)
+    Spread(value~) => self.write_spread_attribute(value, level)
     Bool(name~) => self.w.write_literal(level, " " + name)
   }
+}
+
+///|
+/// `{ attrs... }` is not text of the tag at all: it is whatever the expression
+/// spreads, which only the runtime can write out, so the literal run of the start
+/// tag breaks around it. What it writes is the whole of each attribute, separator
+/// included, exactly as templ's `RenderAttributes` does — the runtime escapes the
+/// names and values it is handed.
+fn Generator::write_spread_attribute(
+  self : Generator,
+  value : String,
+  level : Int32,
+) -> Unit raise GenerateError {
+  let expr = value.trim().to_owned()
+  if expr.is_empty() {
+    raise GenerateError(
+      message="an attribute spread needs an expression: `{ ... }` (" +
+        self.location() +
+        ")",
+    )
+  }
+  self.w.write_indent(level, "@rt.render_attributes(w, " + expr + ")\n")
 }
 
 ///|

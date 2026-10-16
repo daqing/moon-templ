@@ -110,6 +110,10 @@ pub(all) enum Attribute {
   Constant(name~ : String, value~ : String)
   /// `name={ expr }`. `value` keeps the source spelling of the expression.
   Expression(name~ : String, value~ : String)
+  /// `{ attrs... }`, where the whole attribute list comes from a value the
+  /// template computes. `value` is the expression the `...` spreads, keeping its
+  /// source spelling; the `...` is the syntax, not part of the expression.
+  Spread(value~ : String)
   Bool(name~ : String)
 } derive(Debug, Eq)
 
