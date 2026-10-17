@@ -17,16 +17,16 @@ test "a call keeps its arguments verbatim" {
 }
 
 ///|
-/// The marker is not part of the expression, so a package-qualified reference
-/// keeps the `@` MoonBit spells it with and drops the one that means "render".
-test "a package-qualified call keeps the expression's own marker" {
-  assert_eq(parse("@@ui.Card(title)"), [call("@ui.Card(title)", [])])
-  assert_eq(parse("@@ui.card()"), [call("@ui.card()", [])])
+/// A package-qualified call is spelled the way MoonBit spells the reference:
+/// the one `@` marks the call and stands for the package.
+test "a package-qualified call is spelled with one marker" {
+  assert_eq(parse("@ui.Card(title)"), [call("@ui.Card(title)", [])])
+  assert_eq(parse("@ui.card()"), [call("@ui.card()", [])])
 }
 
 ///|
 test "a call expression reaches through fields and indexes" {
-  assert_eq(parse("@model.card(x)"), [call("model.card(x)", [])])
+  assert_eq(parse("@cards[i].first()"), [call("cards[i].first()", [])])
   assert_eq(parse("@cards[i]"), [call("cards[i]", [])])
   assert_eq(parse("@Card(x)::render()"), [call("Card(x)::render()", [])])
 }

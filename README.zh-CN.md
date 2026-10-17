@@ -105,7 +105,7 @@ fn main {
   ```
 
 - 组件用 `@` 调用:`@card(title)`、`@card(title) { ... }`;其他包里的组件写作
-  `@@ui.card(...)`。类型为 `@rt.Component` 的参数用 `@child` 渲染。
+  `@ui.card(...)`。类型为 `@rt.Component` 的参数用 `@child` 渲染。
 - `<style>` 和 `<script>` 的内容原样保留,JavaScript 与 CSS 不会被当成模板语法。
   `<!-- comments -->`、`<!DOCTYPE html>` 以及存放语句的 `{{ MoonBit code }}`
   代码块同样受支持。
@@ -166,7 +166,7 @@ dev_build(
 | `{{ go code }}` | `{{ MoonBit code }}`,原样抄进生成的函数体 |
 | `templ Name()`,Go 里可任意命名 | 模板会变成 MoonBit 函数,名字必须以小写字母或 `_` 开头 |
 | `templ (t T) Name()` | receiver 写法相同,命名规则也相同 |
-| `@Component()` / `@pkg.Component()` | 同包用 `@component()`,其他包用 `@@pkg.component(...)` |
+| `@Component()` / `@pkg.Component()` | 同包用 `@component()`,其他包用 `@pkg.component(...)` |
 | `_templ.go` | `_templ.mbt` |
 | 带 live-reload 代理的 `templ generate --watch` | `--watch` 只负责重新生成,且仅支持 native 目标 |
 | `script` 声明与 `RenderScriptItems` | 尚未实现;`<script>` 元素原样保留,`@rt.ComponentScript` 只渲染调用字符串 |

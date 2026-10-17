@@ -505,9 +505,9 @@ fn Generator::write_node(
 
 ///|
 /// A component call renders to the component the expression names. The call
-/// marker is not part of the expression, so `@Card(title)` becomes
-/// `Card(title).render(ctx, w)` and a package-qualified `@@ui.Card(title)`
-/// becomes `@ui.Card(title).render(ctx, w)`.
+/// marker is not part of a sibling's expression, so `@Card(title)` becomes
+/// `Card(title).render(ctx, w)`; a package-qualified `@ui.Card(title)` keeps
+/// its `@` and becomes `@ui.Card(title).render(ctx, w)`.
 ///
 /// A call with a children block hands them to the component as a component of
 /// its own. The block gets a fresh context: the children are the called

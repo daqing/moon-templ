@@ -1114,11 +1114,11 @@ test "a component call renders the component the expression names" {
 }
 
 ///|
-/// The `@` that marks the call is not part of the expression, so a reference to
-/// another package keeps the one MoonBit spells it with.
+/// A package-qualified call is written the way MoonBit spells the reference,
+/// with its one `@` marking the call.
 test "a package-qualified call keeps the expression's own marker" {
   assert_true(
-    generate_source("templ t() {\n  @@ui.Card(\"x\")\n}\n").contains(
+    generate_source("templ t() {\n  @ui.Card(\"x\")\n}\n").contains(
       "@ui.Card(\"x\").render(ctx, w)\n",
     ),
   )

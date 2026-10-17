@@ -439,8 +439,7 @@ fn write_call_inline(
   level : Int32,
   call : @parser.Call,
 ) -> Unit {
-  out.write_char('@')
-  out.write_string(call.expression)
+  write_call_marker(out, call)
   if !call.children.is_empty() {
     out.write_string(" { ")
     for child in call.children {
@@ -452,13 +451,25 @@ fn write_call_inline(
 
 ///|
 fn write_call(out : StringBuilder, level : Int32, call : @parser.Call) -> Unit {
-  out.write_char('@')
-  out.write_string(call.expression)
+  write_call_marker(out, call)
   if !call.children.is_empty() {
     out.write_string(" {\n")
     write_nodes(out, level + 1, call.children, true, None)
     write_indent(out, level)
     out.write_char('}')
+  }
+}
+
+///|
+/// The call's `@` marker. A package-qualified expression kept its own `@` in
+/// the parser because it doubles as the package reference, so it is written as
+/// it stands rather than with a second marker.
+fn write_call_marker(out : StringBuilder, call : @parser.Call) -> Unit {
+  if call.expression.has_prefix("@") {
+    out.write_string(call.expression)
+  } else {
+    out.write_char('@')
+    out.write_string(call.expression)
   }
 }
 

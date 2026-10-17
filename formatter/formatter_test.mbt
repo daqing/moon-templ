@@ -20,6 +20,15 @@ test "a call's block is spread out and a call in a phrase stays on its line" {
 }
 
 ///|
+/// A package-qualified call is already spelled with its one `@`; formatting it
+/// must not add a second marker.
+test "a package-qualified call keeps its one marker" {
+  let source = "templ t() {\n@ui.card(title) {\n<p>body</p>\n}\n}\n"
+  let expected = "templ t() {\n  @ui.card(title) {\n    <p>body</p>\n  }\n}\n"
+  assert_eq(@formatter.format_source(source), expected)
+}
+
+///|
 test "attributes share the line or take lines of their own" {
   let source = "templ t() {\n<a class=\"a\" data-x={ x } disabled?={ on } { extra... }>x</a>\n<div\nclass=\"a\"\nif dark {\ndata-theme=\"dark\"\n} else {\ndata-theme=\"light\"\n}\nid={ id }\n>\n<p>text</p>\n</div>\n}\n"
   let expected = "templ t() {\n  <a class=\"a\" data-x={ x } disabled?={ on } { extra... }>x</a>\n  <div\n    class=\"a\"\n    if dark {\n      data-theme=\"dark\"\n    } else {\n      data-theme=\"light\"\n    }\n    id={ id }\n  >\n    <p>text</p>\n  </div>\n}\n"

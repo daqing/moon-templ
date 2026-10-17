@@ -2,10 +2,10 @@
 /// Parse a `@expr` or `@expr { ... }` component call. `src` starts at the `@`
 /// marker, which this consumes.
 ///
-/// What follows is a MoonBit expression, and a reference to another package
-/// keeps the `@` MoonBit spells it with, so a call to `ui`'s `Card` is written
-/// `@@ui.Card(title)`. One `@` always means "render this"; the second one, when
-/// present, belongs to the expression.
+/// What follows is a MoonBit expression. A reference to another package is
+/// spelled the way MoonBit spells it, so a call to `ui`'s `card` is written
+/// `@ui.card(title)`: the same `@` marks the call and stands for the package
+/// reference.
 pub fn parse_call(
   src : StringView,
   offset : Int32,
@@ -70,16 +70,32 @@ fn scan_call_expression(
   offset : Int32,
 ) -> (String, StringView) raise ParseError {
   let buf = StringBuilder()
-  let at_name = match src {
-    ['@', .. rest] => {
-      buf.write_char('@')
-      rest
-    }
-    _ => src
+  if is_package_reference(src) {
+    buf.write_char('@')
   }
-  let after_name = take_call_name(at_name, offset, buf)
+  let after_name = take_call_name(src, offset, buf)
   let rest = scan_call_suffixes(after_name, offset, buf)
   (buf.to_string(), rest)
+}
+
+///|
+/// Whether the expression names a component in another package: `ui.card` has
+/// a package name ahead of a `.`, so the `@` that marks the call is also the
+/// reference's own.
+fn is_package_reference(src : StringView) -> Bool {
+  match src {
+    [c, .. rest] if is_ident_start(c) => ident_ends_before_dot(rest)
+    _ => false
+  }
+}
+
+///|
+fn ident_ends_before_dot(src : StringView) -> Bool {
+  match src {
+    ['.', ..] => true
+    [c, .. rest] if is_ident_char(c) => ident_ends_before_dot(rest)
+    _ => false
+  }
 }
 
 ///|

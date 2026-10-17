@@ -26,10 +26,11 @@ pub(all) enum Node {
 } derive(Debug, Eq)
 
 ///|
-/// A component call. `expression` is the source spelling of what follows the
-/// `@` marker, so `@@ui.Card(title)` keeps the package reference's own `@` while
-/// `@Card(title)` does not. Empty `children` means the call stands alone: a
-/// block that holds nothing but whitespace leaves nothing behind either.
+/// A component call. `expression` is the MoonBit expression the call renders:
+/// `@Card(title)` drops the marker and keeps `Card(title)`, while a
+/// package-qualified `@ui.Card(title)` keeps its `@` because it doubles as the
+/// package reference. Empty `children` means the call stands alone: a block
+/// that holds nothing but whitespace leaves nothing behind either.
 pub(all) struct Call {
   expression : String
   children : Array[Node]

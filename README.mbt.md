@@ -53,6 +53,7 @@ runtime. The `ignore` list takes exact file names — no globs.
 Then call the component like any function:
 
 ```moonbit nocheck
+///|
 fn main {
   println(hello("world").to_string())
 }
@@ -108,7 +109,7 @@ fn main {
   ```
 
 - Components are called with `@`: `@card(title)`, `@card(title) { ... }`, and
-  `@@ui.card(...)` for another package. A parameter of type `@rt.Component` is
+  `@ui.card(...)` for another package. A parameter of type `@rt.Component` is
   rendered with `@child`.
 - `<style>` and `<script>` keep their contents verbatim, so JavaScript and CSS
   are not read as template syntax. `<!-- comments -->`, `<!DOCTYPE html>`, and
@@ -173,7 +174,7 @@ template needs its own `dev_build`. This form cannot be combined with the older
 | `{{ go code }}` | `{{ MoonBit code }}`, copied into the generated function body |
 | `templ Name()` with any Go name | The template becomes a MoonBit function, so its name must start with a lowercase letter or `_` |
 | `templ (t T) Name()` | The same receiver syntax, with the same naming rule |
-| `@Component()` / `@pkg.Component()` | `@component()` for a sibling, `@@pkg.component(...)` for another package |
+| `@Component()` / `@pkg.Component()` | `@component()` for a sibling, `@pkg.component(...)` for another package |
 | `_templ.go` | `_templ.mbt` |
 | `templ generate --watch` with a live-reload proxy | `--watch` only regenerates; native target only |
 | `script` declarations and `RenderScriptItems` | Not implemented yet; `<script>` elements are kept verbatim and `@rt.ComponentScript` renders a call string |
