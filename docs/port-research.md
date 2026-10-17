@@ -550,7 +550,7 @@ moon-templ/                      # 本仓库(monorepo,三个 module 或一个 mo
 │   ├── rangewriter.mbt          #   两态写入:累积字面量 vs 写代码
 │   ├── generator.mbt            #   主生成逻辑
 │   └── literal.mbt              #   字符串字面量切分 + MoonBit 转义
-├── cmd/main/                    # CLI:moon-templ generate / fmt / watch
+├── cmd/moon-templ/              # CLI:moon-templ generate / fmt / watch
 └── docs/
 ```
 

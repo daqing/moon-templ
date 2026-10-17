@@ -1,6 +1,6 @@
 # moon-templ
 
-[templ](https://templ.guardian.io/) 的 MoonBit 移植版。组件写在普通的 `.templ`
+[templ](https://templ.guide/) 的 MoonBit 移植版。组件写在普通的 `.templ`
 文件里,生成成普通的 MoonBit 函数后提交进仓库 —— 没有宏,也不在运行时解析模板。
 
 ## 安装
@@ -14,8 +14,8 @@ moon add daqing/moon-templ
 从本仓库的检出构建命令行工具,并放进 `PATH`:
 
 ```bash
-moon build --target native cmd/main
-install -m 755 _build/native/debug/build/cmd/main/main.exe /usr/local/bin/moon-templ
+moon build --target native cmd/moon-templ
+install -m 755 _build/native/debug/build/cmd/moon-templ/moon-templ.exe /usr/local/bin/moon-templ
 ```
 
 ## 快速上手
@@ -125,7 +125,7 @@ moon-templ fmt <file.templ>       # 或 <dir>...
   格式化不会产生任何改动。
 - `--watch` 在模板变化时重新生成,每 250 毫秒轮询一次。它需要时钟,而只有 native
   目标提供时钟:请使用安装好的可执行文件,或运行
-  `moon run --target native cmd/main -- generate --watch ...`。
+  `moon run --target native cmd/moon-templ -- generate --watch ...`。
 
 ## 构建集成
 
@@ -185,7 +185,7 @@ moon info
 
 包的结构:`parser/`(`.templ` 到 AST)、`generator/`(AST 到 MoonBit)、`runtime/`
 (渲染与转义)、`formatter/`(AST 还原为 `.templ`)、`cli/`(命令)以及
-`cmd/main/`(入口)。示例在 `examples/`,从 templ 移植过来的基准用例在 `golden/`。
+`cmd/moon-templ/`(入口)。示例在 `examples/`,从 templ 移植过来的基准用例在 `golden/`。
 
 ## 许可证
 

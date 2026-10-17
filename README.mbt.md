@@ -1,6 +1,6 @@
 # moon-templ
 
-A MoonBit port of [templ](https://templ.guardian.io/). Components are written in
+A MoonBit port of [templ](https://templ.guide/). Components are written in
 plain `.templ` files, generated into ordinary MoonBit functions, and checked in —
 no macros and no runtime template parsing.
 
@@ -16,8 +16,8 @@ Build the command-line tool from a checkout of this repository and put it on
 your `PATH`:
 
 ```bash
-moon build --target native cmd/main
-install -m 755 _build/native/debug/build/cmd/main/main.exe /usr/local/bin/moon-templ
+moon build --target native cmd/moon-templ
+install -m 755 _build/native/debug/build/cmd/moon-templ/moon-templ.exe /usr/local/bin/moon-templ
 ```
 
 ## Quick start
@@ -131,7 +131,7 @@ moon-templ fmt <file.templ>       # or <dir>...
   are left as they stand. Formatting an already formatted file changes nothing.
 - `--watch` regenerates templates as they change, polling every 250 ms. It needs
   a clock, which only the native target offers: use the installed binary, or
-  `moon run --target native cmd/main -- generate --watch ...`.
+  `moon run --target native cmd/moon-templ -- generate --watch ...`.
 
 ## Build integration
 
@@ -193,7 +193,7 @@ moon info
 
 Packages: `parser/` (`.templ` to AST), `generator/` (AST to MoonBit), `runtime/`
 (rendering and escaping), `formatter/` (AST back to `.templ`), `cli/` (the
-command), and `cmd/main/` (the entry point). Examples live in `examples/`, and
+command), and `cmd/moon-templ/` (the entry point). Examples live in `examples/`, and
 the ported templ goldens in `golden/`.
 
 ## License
