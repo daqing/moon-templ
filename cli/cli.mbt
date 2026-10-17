@@ -46,12 +46,30 @@ fn read(path : String) -> String raise CliError {
 /// to it.
 pub fn generate_file(input : String) -> Generated raise CliError {
   let source = read(input)
+  generate_source(input, source)
+}
+
+///|
+/// Generate the template `source`, which was read from the file `input`. The
+/// path is only ever used in reports, so a caller that holds the text of a file
+/// it did not read can still name it.
+fn generate_source(input : String, source : String) -> Generated raise CliError {
   let generated = try {
     let file = @parser.parse_template_file(source)
     @generator.generate(file)
   } catch {
-    @parser.ParseError(offset~, message~) =>
-      raise CliError(message=input + ":" + offset.to_string() + ": " + message)
+    @parser.ParseError(offset~, message~) => {
+      let (line, column) = @parser.line_column(source, offset)
+      raise CliError(
+        message=input +
+          ":" +
+          line.to_string() +
+          ":" +
+          column.to_string() +
+          ": " +
+          message,
+      )
+    }
     @generator.GenerateError(message~) =>
       raise CliError(message=input + ": " + message)
     error => raise CliError(message=input + ": " + error.to_string())

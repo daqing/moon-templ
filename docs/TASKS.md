@@ -4,7 +4,7 @@
 拆分日期:2026-10-17
 目标:把 `a-h/templ` 的模板引擎在 MoonBit 中重新实现
 
-**进度:48 / 58**
+**进度:49 / 58**
 
 ---
 
@@ -20,7 +20,7 @@
   | T2 parser + generator 骨架 | 19 | 19 | 0 |
   | T3 MVP 完整 | 11 | 11 | 0 |
   | T4 属性特殊语义 | 8 | 8 | 0 |
-  | T5 工具链与打磨 | 5 | 0 | 1(T5.2) |
+  | T5 工具链与打磨 | 5 | 1 | 1(T5.2) |
   | T6 可选 / 远期 | 5 | 0 | 3 |
 
 - **每个任务独立可交付。** commit message 以任务号开头,例如 `T2.3: parse element open/close tags`。
@@ -259,7 +259,12 @@
 
 ## Phase 5 — 工具链与打磨(达成 M4)
 
-- [ ] **T5.1** 诊断信息带 文件:行:列 — 模板语法错误时 CLI 输出可点击定位的位置 · 前置 T2.6 · M
+- [x] **T5.1** 诊断信息带 文件:行:列 — 模板语法错误时 CLI 输出可点击定位的位置 · 前置 T2.6 · M
+  - 位置换算放在 `parser/error.mbt` 的 `line_column(source, offset)`,因为 `ParseError.offset` 就是解析器自己的游标;CLI 只负责拼成 `file:line:column: message`。**offset 的单位是 UTF-16 code unit**(`StringView::length` 的计数单位,也是 MoonBit `String` 的下标单位),不是字节,也不是字符数 —— 注释里原先写的 "byte-free character offset" 已改正。
+  - 行按 `\n` 记,列按 **Unicode 字符**数(代理对算一列),所以中文与 emoji 之后的列号与编辑器看到的一致;越界 offset 分别夹到文件头/文件尾,而不是报错。`\r` 不单独断行(`\r\n` 里的 `\r` 算前一列的一个字符),与主流编辑器一致。
+  - CLI 测试通过白盒用例 `cli/diagnostic_wbtest.mbt` 钉住输出文本:把 `generate_file` 里的读文件与生成拆成 `generate_file` + 私有的 `generate_source(input, source)`,后者让测试可以把一段源码冠上文件名来跑,不必真去写坏文件。
+  - 顺带确认既有错误点的偏移是构造起始处:未闭合元素报在 `<div>` 的 `<` 上(`2:3`),而不是在文件末尾。
+  - `moon check` 零警告;`moon test` **408 passed / 0 failed**(较 T4.8 的 400 多出 8:parser 6 + cli 2)。
 - [ ] **T5.2** `moon-templ fmt` 子命令 — 复用 AST 的 `Write`,对已格式化文件**幂等** · 前置 T2.9 · L
 - [ ] **T5.3** `--watch` 热生成 — 改 `.templ` 后自动重新生成 · 前置 T3.9 · M
 - [ ] **T5.4** 零警告 CI 门禁 — CI 断言生成产物编译时**无警告**(port-research §3.2.1 的五类)· 前置 T2.16 · S
