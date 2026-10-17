@@ -1,0 +1,10 @@
+templ conditional_attributes(on : Bool, u : String) {
+  <div>
+    <div if on { class="on" }></div>
+    <div if on { class="on" } else { class="off" }></div>
+    <a if on { href={ u } } else { href="/b" }>link</a>
+    <div id="x" if on { class="yes" } data-k="v"></div>
+    <div if on { class="a" if on { title="t" } }></div>
+    <button if on { disabled } else { type="button" }>b</button>
+  </div>
+}

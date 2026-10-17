@@ -4,7 +4,7 @@
 拆分日期:2026-10-17
 目标:把 `a-h/templ` 的模板引擎在 MoonBit 中重新实现
 
-**进度:47 / 58**
+**进度:48 / 58**
 
 ---
 
@@ -19,7 +19,7 @@
   | T1 runtime 地基 | 5 | 5 | 0 |
   | T2 parser + generator 骨架 | 19 | 19 | 0 |
   | T3 MVP 完整 | 11 | 11 | 0 |
-  | T4 属性特殊语义 | 8 | 7 | 0 |
+  | T4 属性特殊语义 | 8 | 8 | 0 |
   | T5 工具链与打磨 | 5 | 0 | 1(T5.2) |
   | T6 可选 / 远期 | 5 | 0 | 3 |
 
@@ -242,7 +242,18 @@
   - **差分校验**:真 templ 渲染 `templ BoolAttrs(on bool)`(即 `test-html` 里那三行 `<hr>`,把 `true` / `false` 换成参数与 `!on`)两个分支,输出分别是 `<hr noshade><hr optionA optionB optionC="other"><hr noshade>` 与 `<hr><hr optionA optionC="other" optionD><hr noshade>`;golden 断言逐字节相同(含 `hr` 是块级元素、元素之间不留空格这条)。
   - golden:`golden/bool_expression/`,移植 `generator/test-html` 里带 `?={}` 的三行;两个分支各断言一次。已在 `cli/checked_in_wbtest.mbt` 登记。
   - `moon check` 零警告;`moon test` **383 passed / 0 failed**(较 T4.6 的 376 多出 7:解析器 1 + 生成器 4 + golden 2)。
-- [ ] **T4.8** 条件属性 `if expr { attrs } else { attrs }` — 两个分支各有快照 · 前置 T3.4、T3.1 · M
+- [x] **T4.8** 条件属性 `if expr { attrs } else { attrs }` — 两个分支各有快照 · 前置 T3.4、T3.1 · M
+  - 与 `?={}` 的区别是**整块**由运行期决定:分支里放的不是一个属性,而是一整个属性列表。templ 那边是 `parser/v2/conditionalattributeparser.go`,`peekPrefix` 认的是 `"if "`(**带空格**),`if="x"` 仍是叫 `if` 的普通属性 —— 这条照搬,所以本项目的派发是 `src.has_prefix("if ")`,优先于 `parse_named_attribute`,而不是按属性名匹配。
+  - **块的头部不能直接复用 `open_block`**,两条规则都不一样:(1) templ 用 `goexpression.If` 读头部,要求 `{` 与条件**同行**,`if p\n{` 报 "unexpected newline, expecting { after if clause";而 `open_block` 明确允许换行(Phase 2 里是照 templ 的 `for` / `if` 语句块写的)。(2) 反过来,`{` 之后的换行在 `open_block` 里是**必需**的(`take_block_newline`,因为块体是节点),而属性块里是可选的 —— 整条分支写在一行上 templ 也收。所以另写了 `open_attribute_block`:条件里出现换行即报错(**在 `trim_space` 之前查**,否则行尾那个换行会被裁掉、`if p\n{` 反而过检,这是实现时实际踩到的一处),`{` 之后的空白照常吞掉。
+  - 生成形状照抄 templ `writeConditionalAttribute`(`generator.go:1449`):`if <expr> {` / 分支属性 +1 缩进 / `} else {` / 分支属性 +1 缩进 / `}`。templ 那里分支体是递归 `writeElementAttributes(indentLevel, elementName, attr.Then)`,**元素名一并传进去** —— 所以 `<a if on { href={ u } }>` 里那个 `href` 照样走 URL 白名单。本项目同样把 `element` 递归传下去,单测 `a` 的 `href={ u }` 断言生成 `@rt.sanitize_url(u)` 而不是默认的 `@rt.resolve_attribute_value`。
+  - **出错面**(都对照真 templ 验证过):`else if` 是真 templ 的坑 —— 它把 `else` 读成一个**属性**,`<div if p { class="a" } else if q { class="b" }>` 在 `p` 为真时渲染出 `<div class="a" else>`(多一个叫 `else` 的裸布尔属性,再加一段 `if !p`)。这里直接报错("an attribute block has no `else if`")而不是照抄这个产物。空分支(templ:"invalid content or no attributes were found in the if block")、缺 `}`(报错点收在 `>`/`/>`/EOF 上,而不是漏给"expected attribute name")同样各有一条。
+  - `mentions_in_attrs` 再扩一支:`Conditional` 的条件与两个分支都要看,否则 `if on { class={ a } }` 里的 `on` / `a` 会被误报成未用参数(`ignore(...)`)。
+  - **差分校验**:真 templ 渲染同一模板(六个元素:单独 `if`、`if/else`、分支里的表达式 URL 与常量 URL、夹在普通属性之间的条件属性、嵌套条件属性、`disabled` 与 `type="button"` 两个分支)的两个分支,得到
+    - `on=true`:`<div><div class="on"></div><div class="on"></div><a href="/a?x=1">link</a><div id="x" class="yes" data-k="v"></div><div class="a" title="t"></div><button disabled>b</button></div>`
+    - `on=false`:`<div><div></div><div class="off"></div><a href="/b">link</a><div id="x" data-k="v"></div><div></div><button type="button">b</button></div>`
+    golden 逐字节断言这两串;生成文件的形状(分支缩进、字面量在 `if` 处断开、嵌套条件属性多一层)也与 templ 生成的 Go **逐行同构**。
+  - golden:`golden/condition/`(模板即上面那六个元素)。已在 `cli/checked_in_wbtest.mbt` 登记。
+  - `moon check` 零警告;`moon test` **400 passed / 0 failed**(较 T4.7 的 383 多出 17:解析器 10 + 生成器 5 + golden 2)。
 
 ---
 

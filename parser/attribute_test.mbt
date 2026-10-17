@@ -232,3 +232,166 @@ test "a boolean expression attribute needs its expression" {
     ),
   )
 }
+
+///|
+fn conditional(
+  condition : String,
+  then : Array[@parser.Attribute],
+  else_ : Array[@parser.Attribute],
+) -> @parser.Attribute {
+  Conditional(condition~, then~, else_~)
+}
+
+///|
+/// `if expr { attrs }` inside a start tag: which attributes the tag carries is
+/// what the expression decides, and a block with no `else` simply carries none
+/// when the condition is false.
+test "conditional attribute" {
+  assert_eq(attrs_of("<div if x { class=\"a\" }></div>"), [
+    conditional("x", [constant("class", "a")], []),
+  ])
+  assert_eq(attrs_of("<div if x { class=\"a\" } else { class=\"b\" }></div>"), [
+    conditional("x", [constant("class", "a")], [constant("class", "b")]),
+  ])
+}
+
+///|
+/// The condition is copied through the way a block head is, so it may be any
+/// expression MoonBit writes — boolean operators, calls, braces of its own, which
+/// the head scan steps over rather than ends at.
+test "a conditional attribute copies its condition" {
+  assert_eq(attrs_of("<div if a && !b { class=\"a\" }></div>"), [
+    conditional("a && !b", [constant("class", "a")], []),
+  ])
+  assert_eq(attrs_of("<div if f({ x: 1 }) { class=\"a\" }></div>"), [
+    conditional("f({ x: 1 })", [constant("class", "a")], []),
+  ])
+}
+
+///|
+/// A block holds attributes, and an attribute list holds every form an attribute
+/// takes: a boolean, an expression, a spread, and a conditional inside a
+/// conditional.
+test "a conditional attribute holds every form of attribute" {
+  assert_eq(
+    attrs_of(
+      "<div if x { class=\"a\" hidden if y { title=\"t\" } { attrs... } }></div>",
+    ),
+    [
+      conditional(
+        "x",
+        [
+          constant("class", "a"),
+          Bool(name="hidden"),
+          conditional("y", [constant("title", "t")], []),
+          spread("attrs"),
+        ],
+        [],
+      ),
+    ],
+  )
+}
+
+///|
+/// A conditional attribute is one of the list like any other, and the attributes
+/// around it are none of its business.
+test "a conditional attribute stands among the others" {
+  assert_eq(
+    attrs_of("<div id=\"a\" if x { class=\"b\" } data-k=\"c\"></div>"),
+    [
+      constant("id", "a"),
+      conditional("x", [constant("class", "b")], []),
+      constant("data-k", "c"),
+    ],
+  )
+}
+
+///|
+/// `if` on its own is an attribute of that name — the marker is the space, as it
+/// is in templ, so `if="x"` is a value and not a block.
+test "an attribute named if is not a conditional one" {
+  assert_eq(attrs_of("<div if=\"x\"></div>"), [constant("if", "x")])
+  assert_eq(attrs_of("<div if></div>"), [Bool(name="if")])
+}
+
+///|
+/// The head reads to the `{` that opens the block, so a condition that runs off
+/// the end of the tag is an error rather than a condition with the rest of the
+/// file in it.
+test "a conditional attribute needs a condition and a block" {
+  assert_eq(
+    error_of("<div if x class=\"a\"></div>"),
+    @parser.ParseError(offset=0, message="if: missing '{' after the condition"),
+  )
+  assert_eq(
+    error_of("<div if { class=\"a\" }></div>"),
+    @parser.ParseError(offset=0, message="if: expected a condition before '{'"),
+  )
+}
+
+///|
+/// templ reads the head with its Go parser, which wants the brace on the line the
+/// condition is on; the newline after the brace is the other way round, since
+/// what follows is an attribute list rather than a node list, so a branch may sit
+/// on one line.
+test "a conditional attribute keeps its brace on the condition's line" {
+  assert_eq(
+    error_of("<div if x\n{ class=\"a\" }></div>"),
+    @parser.ParseError(
+      offset=0,
+      message="if: expected '{' on the line the condition is on",
+    ),
+  )
+  assert_eq(attrs_of("<div if x {\n  class=\"a\"\n}></div>"), [
+    conditional("x", [constant("class", "a")], []),
+  ])
+}
+
+///|
+/// A branch with nothing in it says nothing, so it is not a branch templ accepts
+/// — and neither does the port.
+test "an empty conditional attribute block is an error" {
+  assert_eq(
+    error_of("<div if x { }></div>"),
+    @parser.ParseError(
+      offset=0,
+      message="if: expected attributes in the block, but none were found",
+    ),
+  )
+  assert_eq(
+    error_of("<div if x { class=\"a\" } else { }></div>"),
+    @parser.ParseError(
+      offset=0,
+      message="else: expected attributes in the block, but none were found",
+    ),
+  )
+}
+
+///|
+/// An attribute block has no `else if`: templ reads one as an `else` attribute
+/// and a second `if`, which renders the word `else` into the tag, so the port
+/// refuses it rather than write that.
+test "an else if in an attribute block is refused" {
+  assert_eq(
+    error_of("<div if x { class=\"a\" } else if y { class=\"b\" }></div>"),
+    @parser.ParseError(
+      offset=0,
+      message="else: expected '{' after it, since an attribute block has no `else if`",
+    ),
+  )
+}
+
+///|
+/// The `}` that closes a branch is where the block ends, and a block that never
+/// reaches one is an error rather than an attribute list that eats the rest of
+/// the file.
+test "an unterminated conditional attribute block is an error" {
+  assert_eq(
+    error_of("<div if x { class=\"a\">"),
+    @parser.ParseError(offset=0, message="if: missing '}' to close the block"),
+  )
+  assert_eq(
+    error_of("<div if x { class=\"a\" } else { class=\"b\">"),
+    @parser.ParseError(offset=0, message="else: missing '}' to close the block"),
+  )
+}

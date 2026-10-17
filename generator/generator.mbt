@@ -414,12 +414,19 @@ fn match_mentions(expr : @parser.MatchExpression, name : String) -> Bool {
 }
 
 ///|
-/// Whether any attribute holds an expression that reads `name`.
+/// Whether any attribute holds an expression that reads `name`. A conditional
+/// attribute holds two lists of them, so both are looked through.
 fn mentions_in_attrs(attrs : Array[@parser.Attribute], name : String) -> Bool {
   for attr in attrs {
     match attr {
       Expression(value~, ..) | Spread(value~) | BoolExpression(value~, ..) =>
         if mentions(value[:], name[:], None) {
+          return true
+        }
+      Conditional(condition~, then~, else_~) =>
+        if mentions(condition[:], name[:], None) ||
+          mentions_in_attrs(then, name) ||
+          mentions_in_attrs(else_, name) {
           return true
         }
       Constant(_) | Bool(_) => ()
@@ -770,7 +777,44 @@ fn Generator::write_attribute(
     Bool(name~) => self.w.write_literal(level, " " + name)
     BoolExpression(name~, value~) =>
       self.write_bool_expression_attribute(name, value, level)
+    Conditional(condition~, then~, else_~) =>
+      self.write_conditional_attribute(condition, then, else_, element, level)
   }
+}
+
+///|
+/// `if expr { attrs } else { attrs }`: which attributes the tag carries is decided
+/// where the tag is written, so the whole block becomes one. The branch bodies are
+/// attribute lists like any other, which is why each of them may hold a spread or
+/// an attribute of its own kind, and why the element name goes in with them: an
+/// `href` inside a branch is as much a URL as one outside it.
+fn Generator::write_conditional_attribute(
+  self : Generator,
+  condition : String,
+  then : Array[@parser.Attribute],
+  else_ : Array[@parser.Attribute],
+  element : String,
+  level : Int32,
+) -> Unit raise GenerateError {
+  let expr = condition.trim().to_owned()
+  if expr.is_empty() {
+    raise GenerateError(
+      message="a conditional attribute needs a condition: `if { }` (" +
+        self.location() +
+        ")",
+    )
+  }
+  self.w.write_indent(level, "if " + expr + " {\n")
+  for attr in then {
+    self.write_attribute(attr, element, level + 1)
+  }
+  if !else_.is_empty() {
+    self.w.write_indent(level, "} else {\n")
+    for attr in else_ {
+      self.write_attribute(attr, element, level + 1)
+    }
+  }
+  self.w.write_indent(level, "}\n")
 }
 
 ///|

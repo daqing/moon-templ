@@ -73,7 +73,152 @@ fn parse_attribute(
 ) -> (Attribute, StringView) raise ParseError {
   match src {
     ['{', .. rest] => parse_spread_attribute(rest, offset)
-    _ => parse_named_attribute(src, offset)
+    _ =>
+      // `if ` is what tells a conditional attribute from one called `if`, as it
+      // does in templ: `if="x"` is an attribute of that name.
+      if src.has_prefix("if "[:]) {
+        parse_conditional_attribute(src, offset)
+      } else {
+        parse_named_attribute(src, offset)
+      }
+  }
+}
+
+///|
+/// `if expr { attrs } else { attrs }`: the attributes a tag carries, decided at
+/// render time. Nothing about the branch is text of the tag, so what is between
+/// the braces is a list of attributes and nothing else.
+fn parse_conditional_attribute(
+  src : StringView,
+  offset : Int32,
+) -> (Attribute, StringView) raise ParseError {
+  let after_if = drop_prefix(src, "if "[:])
+  let (condition, after_open) = open_attribute_block(after_if, offset)
+  let then_attrs : Array[Attribute] = []
+  let at_close = parse_branch_attributes(after_open, offset, then_attrs, "if")
+  if then_attrs.is_empty() {
+    raise ParseError(
+      offset~,
+      message="if: expected attributes in the block, but none were found",
+    )
+  }
+  let (else_attrs, at_close) = match take_attribute_else(at_close, offset) {
+    Some(pair) => pair
+    None => ([], at_close)
+  }
+  (
+    Conditional(condition~, then=then_attrs, else_=else_attrs),
+    close_brace(at_close, offset, keyword="if"),
+  )
+}
+
+///|
+/// The head of an attribute branch — `if <condition>` and the `{` that opens it,
+/// with the view inside the block.
+///
+/// templ reads this head with its Go parser, which wants the brace on the line the
+/// condition is on: `if p` with a `{` below it is "unexpected newline, expecting {
+/// after if clause" there, which is why `open_block` is not the one used here. The
+/// other way round is fine — the newline *after* the brace is optional, since what
+/// follows is an attribute list rather than a node list, so a whole branch may sit
+/// on one line.
+fn open_attribute_block(
+  src : StringView,
+  offset : Int32,
+) -> (String, StringView) raise ParseError {
+  let buf = StringBuilder()
+  let at_brace = match scan_head(src, 0, buf, at_open_brace) {
+    Some(rest) => rest
+    None =>
+      raise ParseError(offset~, message="if: missing '{' after the condition")
+  }
+  // The newline is looked for before the text is trimmed, since the one templ
+  // rejects is the one that put the brace on the next line.
+  let head = buf.to_string()
+  if head.contains("\n") {
+    raise ParseError(
+      offset~,
+      message="if: expected '{' on the line the condition is on",
+    )
+  }
+  let condition = trim_space(head)
+  if condition.is_empty() {
+    raise ParseError(offset~, message="if: expected a condition before '{'")
+  }
+  match take_spaces(at_brace) {
+    ['{', .. rest] => (condition, skip_space(rest))
+    _ =>
+      raise ParseError(offset~, message="if: expected '{' after the condition")
+  }
+}
+
+///|
+/// Read attributes up to the `}` that closes the branch, which is left where it
+/// stands: whether it opens an `else` is the caller's to decide.
+fn parse_branch_attributes(
+  src : StringView,
+  offset : Int32,
+  out : Array[Attribute],
+  keyword : String,
+) -> StringView raise ParseError {
+  let at = skip_space(src)
+  match at {
+    // The `>` of the tag is where the list would have ended had the branch been
+    // closed, so a block that reaches one never had its `}`.
+    [] | ['>', ..] | ['/', '>', ..] =>
+      raise ParseError(
+        offset~,
+        message=keyword + ": missing '}' to close the block",
+      )
+    ['}', ..] => at
+    _ => {
+      let (attr, rest) = parse_attribute(at, offset)
+      out.push(attr)
+      parse_branch_attributes(rest, offset, out, keyword)
+    }
+  }
+}
+
+///|
+/// The `} else { attrs }` of a conditional attribute, if that is what stands here.
+/// The opening `}` of the else is the one that closed the `if` branch, so a `}`
+/// that is followed by anything else means the block has no else at all.
+///
+/// `else if` is not a form an attribute block has, and templ reads one as an
+/// `else` attribute followed by a second `if` — `<div if p { class="a" } else if q
+/// { class="b" }>` renders `<div class="a" else>` for a true `p`. Refusing it says
+/// what to write instead of rendering that.
+fn take_attribute_else(
+  src : StringView,
+  offset : Int32,
+) -> (Array[Attribute], StringView)? raise ParseError {
+  match src {
+    ['}', .. after_brace] =>
+      match skip_space(after_brace) {
+        ['e', 'l', 's', 'e', .. after_else] =>
+          match skip_space(after_else) {
+            ['{', .. body] => {
+              let attrs : Array[Attribute] = []
+              let at_close = parse_branch_attributes(
+                body, offset, attrs, "else",
+              )
+              if attrs.is_empty() {
+                raise ParseError(
+                  offset~,
+                  message="else: expected attributes in the block, but none were found",
+                )
+              }
+              Some((attrs, at_close))
+            }
+            _ =>
+              raise ParseError(
+                offset~,
+                message="else: expected '{' after it, since an attribute block has no `else if`",
+              )
+          }
+        _ => None
+      }
+    _ => None
   }
 }
 

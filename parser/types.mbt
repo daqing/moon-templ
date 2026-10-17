@@ -121,6 +121,14 @@ pub(all) enum Attribute {
   /// true. `value` keeps the source spelling of the expression, which is the
   /// whole of what the attribute says.
   BoolExpression(name~ : String, value~ : String)
+  /// `if expr { attrs } else { attrs }`: which attributes the tag carries is
+  /// decided at render time. `condition` keeps the source spelling of the
+  /// expression, and `else_` is empty when the block has no else.
+  Conditional(
+    condition~ : String,
+    then~ : Array[Attribute],
+    else_~ : Array[Attribute]
+  )
 } derive(Debug, Eq)
 
 ///|
