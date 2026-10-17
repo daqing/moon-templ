@@ -12,8 +12,9 @@ fn generated_source_of(path : String) -> String raise {
 fn checked_in_templates() -> Array[String] {
   [
     "examples/hello/hello.templ", "examples/site/layout.templ", "examples/site/page.templ",
-    "examples/site/ui/card.templ", "golden/call/call.templ", "golden/class/class.templ",
-    "golden/for/for.templ", "golden/if/if.templ", "golden/script/script.templ", "golden/style/style.templ",
+    "examples/site/ui/card.templ", "golden/bool_expression/bool_expression.templ",
+    "golden/call/call.templ", "golden/class/class.templ", "golden/for/for.templ",
+    "golden/if/if.templ", "golden/script/script.templ", "golden/style/style.templ",
     "golden/url/url.templ",
   ]
 }

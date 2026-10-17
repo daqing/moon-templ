@@ -414,11 +414,11 @@ fn match_mentions(expr : @parser.MatchExpression, name : String) -> Bool {
 }
 
 ///|
-/// Whether any `name={ expr }` attribute reads `name`.
+/// Whether any attribute holds an expression that reads `name`.
 fn mentions_in_attrs(attrs : Array[@parser.Attribute], name : String) -> Bool {
   for attr in attrs {
     match attr {
-      Expression(value~, ..) | Spread(value~) =>
+      Expression(value~, ..) | Spread(value~) | BoolExpression(value~, ..) =>
         if mentions(value[:], name[:], None) {
           return true
         }
@@ -768,7 +768,37 @@ fn Generator::write_attribute(
       self.write_expression_attribute(name, element, value, level)
     Spread(value~) => self.write_spread_attribute(value, level)
     Bool(name~) => self.w.write_literal(level, " " + name)
+    BoolExpression(name~, value~) =>
+      self.write_bool_expression_attribute(name, value, level)
   }
+}
+
+///|
+/// `name?={ expr }`: the attribute is written only when the expression says so,
+/// which is the one attribute whose presence a template decides at render time.
+/// templ's `writeBoolExpressionAttribute` wraps the attribute key in an `if` of
+/// its own, and that is what happens here too — the literal run of the start tag
+/// breaks around it, and the space before the name belongs to what the branch
+/// writes, so the text before it ends at the tag name.
+fn Generator::write_bool_expression_attribute(
+  self : Generator,
+  name : String,
+  value : String,
+  level : Int32,
+) -> Unit raise GenerateError {
+  let expr = value.trim().to_owned()
+  if expr.is_empty() {
+    raise GenerateError(
+      message="a boolean expression attribute needs an expression: `" +
+        name +
+        "?={ }` (" +
+        self.location() +
+        ")",
+    )
+  }
+  self.w.write_indent(level, "if " + expr + " {\n")
+  self.w.write_literal(level + 1, " " + name)
+  self.w.write_indent(level, "}\n")
 }
 
 ///|

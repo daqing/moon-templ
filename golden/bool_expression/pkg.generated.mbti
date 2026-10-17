@@ -1,0 +1,17 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "daqing/moon-templ/golden/bool_expression"
+
+import {
+  "daqing/moon-templ/runtime",
+}
+
+// Values
+pub fn bool_expression_attributes(Bool) -> @runtime.Component
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

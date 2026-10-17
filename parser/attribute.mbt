@@ -131,13 +131,20 @@ fn parse_named_attribute(
       let (attr, after) = parse_attribute_value(rest, name, offset)
       (attr, after)
     }
-    ['?', ..] =>
-      raise ParseError(
-        offset~,
-        message="boolean expression attributes are not supported yet: " +
-          name +
-          "?={ ... }",
-      )
+    ['?', .. rest] => {
+      let after_marker = match rest {
+        ['=', '{', .. expr_src] => expr_src
+        _ =>
+          raise ParseError(
+            offset~,
+            message="a boolean expression attribute is written `" +
+              name +
+              "?={ expr }`",
+          )
+      }
+      let (value, after) = scan_expression(after_marker, offset)
+      (BoolExpression(name~, value~), after)
+    }
     _ => (Bool(name~), after_name)
   }
 }

@@ -4,7 +4,7 @@
 拆分日期:2026-10-17
 目标:把 `a-h/templ` 的模板引擎在 MoonBit 中重新实现
 
-**进度:46 / 58**
+**进度:47 / 58**
 
 ---
 
@@ -19,7 +19,7 @@
   | T1 runtime 地基 | 5 | 5 | 0 |
   | T2 parser + generator 骨架 | 19 | 19 | 0 |
   | T3 MVP 完整 | 11 | 11 | 0 |
-  | T4 属性特殊语义 | 8 | 6 | 0 |
+  | T4 属性特殊语义 | 8 | 7 | 0 |
   | T5 工具链与打磨 | 5 | 0 | 1(T5.2) |
   | T6 可选 / 远期 | 5 | 0 | 3 |
 
@@ -228,7 +228,20 @@
   - **差分校验**:Go 探针(`templ.ComponentScript{Call: templ.SafeScript(...)}` 手工构造,绕开 script 块)把四种模板形状渲染一遍,逐字节作为 golden 断言:两个 `onClick` / `onMouseover`、`hx-on::click` + `onclick` 两个按钮、两个常量按钮、以及反例 `OnClick` + `data-on`(值用 `a<b`,确认走转义)。另用 `templ.ResolveAttributeValue` 直接确认了那条不转义的 `case ComponentScript`,以及 `OnClick={ script() }` 缺 `<script>` 定义的现象。
   - golden:`golden/script/`(四个模板),其中的 call 字符串按 templ `SafeScript` 的产物手写 —— script 块本身留给 T6.2,golden 只钉属性侧规则。已在 `cli/checked_in_wbtest.mbt` 登记。
   - `moon check` 零警告;`moon test` **376 passed / 0 failed**(较 T4.5 的 368 多出 8:生成器 3 + golden 5)。
-- [ ] **T4.7** 布尔表达式属性 `name?={ expr }` — 假值时整个属性消失 · 前置 T3.1 · S
+- [x] **T4.7** 布尔表达式属性 `name?={ expr }` — 假值时整个属性消失 · 前置 T3.1 · S
+  - 语法在 templ 那边是 `boolExpressionStart = Or("?={ ", "?={")`(`parser/v2/elementparser.go:279`):**属性名先解析**,`?` 不在属性名字符集里(本项目 `is_attr_name_char` 同样不含 `?`),所以 `a?={ x }` 读出来是名字 `a` 加一个 `?=`。本项目解析器原先在这条分支上直接抛 "boolean expression attributes are not supported yet",本次换成 `BoolExpression(name, value)` 这一支。
+  - 生成形状照抄 templ `writeBoolExpressionAttribute`(`generator.go:1245`):**只把属性名包进 if**,值不参与 ——
+    ```
+    if <expr> {
+      w.write_string(" name")
+    }
+    ```
+    有趣的是**空格属于分支内**,所以 `if` 之前的字面量跑到标签名就断了(`"<hr"`),`if` 之后的字面量从下一个属性(或 `>`)接着写。这也说明 `RangeWriter` 的字面量攒批必须被 `if` 打断:实现上先 `write_indent(level, "if … {\n")`(它会 flush 掉挂起的字面量),再 `write_literal(level + 1, " name")`,再 `write_indent(level, "}\n")` —— 第三句按**字面量自己记的 level**(`+1`)缩进,不然会写到 if 外面去。
+  - 解析器的错误面收窄成一条:`?` 之后必须是 `={`。`<div a?{ x }>` / `<div a?="x">` 报 "a boolean expression attribute is written `a?={ expr }`";`<div a?={ x ></div>` 仍走表达式扫描器的 "unterminated expression"。生成器另有一条防御:表达式为空的 `x?={  }` 直接报错(与 `name={ }` 同样处理)。
+  - `mentions_in_attrs` 一并扩到三种带表达式的形态(`Expression` / `Spread` / `BoolExpression`),否则 `a?={ on }` 里的 `on` 不算被读。
+  - **差分校验**:真 templ 渲染 `templ BoolAttrs(on bool)`(即 `test-html` 里那三行 `<hr>`,把 `true` / `false` 换成参数与 `!on`)两个分支,输出分别是 `<hr noshade><hr optionA optionB optionC="other"><hr noshade>` 与 `<hr><hr optionA optionC="other" optionD><hr noshade>`;golden 断言逐字节相同(含 `hr` 是块级元素、元素之间不留空格这条)。
+  - golden:`golden/bool_expression/`,移植 `generator/test-html` 里带 `?={}` 的三行;两个分支各断言一次。已在 `cli/checked_in_wbtest.mbt` 登记。
+  - `moon check` 零警告;`moon test` **383 passed / 0 failed**(较 T4.6 的 376 多出 7:解析器 1 + 生成器 4 + golden 2)。
 - [ ] **T4.8** 条件属性 `if expr { attrs } else { attrs }` — 两个分支各有快照 · 前置 T3.4、T3.1 · M
 
 ---

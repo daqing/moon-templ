@@ -117,6 +117,10 @@ pub(all) enum Attribute {
   /// source spelling; the `...` is the syntax, not part of the expression.
   Spread(value~ : String)
   Bool(name~ : String)
+  /// `name?={ expr }`: the attribute is written only when the expression is
+  /// true. `value` keeps the source spelling of the expression, which is the
+  /// whole of what the attribute says.
+  BoolExpression(name~ : String, value~ : String)
 } derive(Debug, Eq)
 
 ///|

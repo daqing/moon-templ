@@ -42,6 +42,7 @@ pub(all) enum Attribute {
   Expression(name~ : String, value~ : String)
   Spread(value~ : String)
   Bool(name~ : String)
+  BoolExpression(name~ : String, value~ : String)
 } derive(Eq, @debug.Debug)
 pub fn Attribute::equal(Self, Self) -> Bool
 pub fn Attribute::not_equal(Self, Self) -> Bool

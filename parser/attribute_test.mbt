@@ -192,12 +192,43 @@ test "an unterminated attribute spread is an error" {
 }
 
 ///|
-test "boolean expression attributes are still rejected" {
+/// `name?={ expr }` is the form `name` and `name={ expr }` do not cover: the
+/// attribute is the same one either way, and what the expression decides is
+/// whether it is written at all.
+test "boolean expression attribute" {
+  assert_eq(attrs_of("<div a?={ x }></div>"), [
+    BoolExpression(name="a", value=" x "),
+  ])
+  assert_eq(attrs_of("<div a?={x}></div>"), [
+    BoolExpression(name="a", value="x"),
+  ])
+  assert_eq(attrs_of("<div a={ x } a2?={ y }></div>"), [
+    expression("a", " x "),
+    BoolExpression(name="a2", value=" y "),
+  ])
+}
+
+///|
+/// The `?=` has to be followed by an expression in braces, and the braces have to
+/// close: a `?` on its own is not the form, and an expression that runs off the
+/// end of the tag is not one either.
+test "a boolean expression attribute needs its expression" {
   assert_eq(
-    error_of("<div a?={ x }></div>"),
+    error_of("<div a?={ x ></div>"),
+    @parser.ParseError(offset=0, message="unterminated expression"),
+  )
+  assert_eq(
+    error_of("<div a?{ x }></div>"),
     @parser.ParseError(
       offset=0,
-      message="boolean expression attributes are not supported yet: a?={ ... }",
+      message="a boolean expression attribute is written `a?={ expr }`",
+    ),
+  )
+  assert_eq(
+    error_of("<div a?=\"x\"></div>"),
+    @parser.ParseError(
+      offset=0,
+      message="a boolean expression attribute is written `a?={ expr }`",
     ),
   )
 }
