@@ -4,7 +4,7 @@
 拆分日期:2026-10-17
 目标:把 `a-h/templ` 的模板引擎在 MoonBit 中重新实现
 
-**进度:51 / 58**
+**进度:52 / 58**
 
 ---
 
@@ -20,7 +20,7 @@
   | T2 parser + generator 骨架 | 19 | 19 | 0 |
   | T3 MVP 完整 | 11 | 11 | 0 |
   | T4 属性特殊语义 | 8 | 8 | 0 |
-  | T5 工具链与打磨 | 5 | 3 | 1(T5.4) |
+  | T5 工具链与打磨 | 5 | 4 | 1(T5.5) |
   | T6 可选 / 远期 | 5 | 0 | 3 |
 
 - **每个任务独立可交付。** commit message 以任务号开头,例如 `T2.3: parse element open/close tags`。
@@ -278,7 +278,10 @@
   - **计时只能落在 native**:MoonBit 的 `@sys` 与 `moonbitlang/x` 都没有 sleep,用 C FFI 绑 `usleep`;`cli/moon.pkg` 用 `options(targets:)` 把实现分成 `watch_native.mbt` 与 `watch_other.mbt`,后者在进入循环前就明确拒绝:"watch mode needs the native target"。这也意味着 `moon run cmd/main -- generate --watch ...` 需加 `--target native`。
   - 参数解析顺带升级:`generate` 现在接受选项,未知选项(如 `--frobnicate`)报错退出;两个路径仍然算用法错误。
   - 实测:在暂存目录起 watcher,改 `hello.templ` 的文案,一个轮询周期内 `hello_templ.mbt` 就带上了新文本并重启进程验证了 native 构建;wasm-gc 下的拒绝路径退出码为 1。`moon check`(wasm-gc 与 native)零警告;`moon test` **428 passed / 0 failed**(较 T5.2 的 424 多出 4)。
-- [ ] **T5.4** 零警告 CI 门禁 — CI 断言生成产物编译时**无警告**(port-research §3.2.1 的五类)· 前置 T2.16 · S
+- [x] **T5.4** 零警告 CI 门禁 — CI 断言生成产物编译时**无警告**(port-research §3.2.1 的五类)· 前置 T2.16 · S
+  - 新增 `.github/workflows/ci.yml`:push / pull_request 触发,装好 MoonBit 后跑 `moon check --deny-warn` 与 `moon test --deny-warn`。产物 `*_templ.mbt` 就在各自包里参与编译,所以"门禁覆盖到产物"不需要单独的命令 —— 生成器一旦吐出未使用参数、`unused_value`、`StringBuilder::new()` 这类警告,CI 直接红。
+  - 产物是否与生成器当前输出一致由既有护栏保证(`cli/checked_in_wbtest.mbt` 逐一比对已入库产物、`every template in the tree` 防漏登记),因此过期产物不会让门禁变成"只校验旧文件"。
+  - 本地实测两条命令均以 0 退出(wasm-gc 默认目标);`moon check --target native` 同样零警告。工作流 YAML 用 Ruby 的 YAML 解析验证过语法。
 - [ ] **T5.5** 文档与示例完善 — 双语文档;pre-build 接线示例;与 templ 的差异清单 · 前置 T3.9 · M
 
 ---
