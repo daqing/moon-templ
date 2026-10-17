@@ -64,6 +64,8 @@ pub(all) struct Element {
   attrs : Array[Attribute]
   children : Array[Node]
   self_closing : Bool
+  indent_attrs : Bool
+  indent_children : Bool
 } derive(Eq, @debug.Debug)
 pub fn Element::equal(Self, Self) -> Bool
 pub fn Element::not_equal(Self, Self) -> Bool
@@ -143,6 +145,8 @@ pub(all) struct Template {
   receiver : String
   params : String
   nodes : Array[Node]
+  start : Int
+  end : Int
 } derive(Eq, @debug.Debug)
 pub fn Template::equal(Self, Self) -> Bool
 pub fn Template::not_equal(Self, Self) -> Bool

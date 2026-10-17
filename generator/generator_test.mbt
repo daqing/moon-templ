@@ -686,6 +686,8 @@ test "an expression attribute cuts the literal run around it" {
         ],
         children: [],
         self_closing: false,
+        indent_attrs: false,
+        indent_children: false,
       }),
     ]),
     ["<div class=\"a\" id=\"", "\" data-x=\"c\"></div>"],
@@ -851,6 +853,8 @@ test "an expression inside an element keeps the tags around it" {
         attrs: [],
         children: [@parser.StringExpression(" name ")],
         self_closing: false,
+        indent_attrs: false,
+        indent_children: false,
       }),
     ]),
     ["<div>", "</div>"],
@@ -1004,7 +1008,14 @@ fn generate_literals_of_nodes(
 fn hand_built(nodes : Array[@parser.Node]) -> @parser.TemplateFile {
   @parser.TemplateFile::{
     templates: [
-      @parser.Template::{ name: "hello", receiver: "", params: "", nodes, },
+      @parser.Template::{
+        name: "hello",
+        receiver: "",
+        params: "",
+        nodes,
+        start: 0,
+        end: 0,
+      },
     ],
   }
 }

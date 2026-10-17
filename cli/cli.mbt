@@ -6,7 +6,9 @@ pub(all) suberror CliError {
 
 ///|
 pub const USAGE : String = "moon-templ generate <file.templ>\n" +
-  "       moon-templ generate <dir>/..."
+  "       moon-templ generate <dir>/...\n" +
+  "       moon-templ fmt <file.templ>\n" +
+  "       moon-templ fmt <dir>/..."
 
 ///|
 /// Where the MoonBit for `hello.templ` goes: `hello_templ.mbt`, beside it. templ
@@ -211,6 +213,105 @@ pub fn generate_tree(root : String) -> Int32 raise CliError {
 }
 
 ///|
+/// What one format run did to a file.
+pub(all) enum Formatted {
+  Written(path~ : String)
+  Unchanged(path~ : String)
+}
+
+///|
+/// Format the template `source`, which was read from the file `input`; the path
+/// is used the way `generate_source` uses it, to point at the place a syntax
+/// error was found.
+fn format_source_of(input : String, source : String) -> String raise CliError {
+  @formatter.format_source(source) catch {
+    @parser.ParseError(offset~, message~) => {
+      let (line, column) = @parser.line_column(source, offset)
+      raise CliError(
+        message=input +
+          ":" +
+          line.to_string() +
+          ":" +
+          column.to_string() +
+          ": " +
+          message,
+      )
+    }
+  }
+}
+
+///|
+/// Rewrite one template file in place, and report what happened to it. A file
+/// the formatter would leave as it stands is not rewritten, for the same reason
+/// an up-to-date generation is not.
+pub fn format_file(input : String) -> Formatted raise CliError {
+  let source = read(input)
+  let formatted = format_source_of(input, source)
+  if formatted == source {
+    return Unchanged(path=input)
+  }
+  @fs.write_string_to_file(input, formatted) catch {
+    @fs.IOError(message) =>
+      raise CliError(message="cannot write " + input + ": " + message)
+  }
+  Written(path=input)
+}
+
+///|
+/// How one file of a batch reads in the report.
+fn format_report(result : Formatted) -> String {
+  match result {
+    Written(path~) => "formatted " + path
+    Unchanged(path~) => path + " is already formatted"
+  }
+}
+
+///|
+/// Format every template under `root`. A file that cannot be formatted is
+/// reported and the batch carries on, the way `generate_tree` does it; the run
+/// fails if any of them did. Returns the number of files that failed.
+pub fn format_tree(root : String) -> Int32 raise CliError {
+  let files = templ_files_under(root)
+  if files.is_empty() {
+    raise CliError(message="no .templ files under " + root)
+  }
+  let mut failures = 0
+  for file in files {
+    println(format_report(format_file(file))) catch {
+      CliError(message~) => {
+        eprintln("moon-templ: " + message)
+        failures = failures + 1
+      }
+    }
+  }
+  failures
+}
+
+///|
+fn run_format(argv : ArrayView[String]) -> Int32 {
+  if argv.length() != 3 {
+    eprintln("usage: " + USAGE)
+    return 1
+  }
+  let argument = argv[2]
+  try {
+    if is_tree_argument(argument) {
+      return if format_tree(tree_root(argument)) == 0 { 0 } else { 1 }
+    }
+    if is_dir(argument) {
+      return if format_tree(argument) == 0 { 0 } else { 1 }
+    }
+    println(format_report(format_file(argument)))
+    0
+  } catch {
+    CliError(message~) => {
+      eprintln("moon-templ: " + message)
+      1
+    }
+  }
+}
+
+///|
 /// Run the command line, argv as the runtime hands it over — the executable
 /// first, so the arguments start at index one. Returns the process exit code.
 pub fn run(argv : ArrayView[String]) -> Int32 {
@@ -220,6 +321,7 @@ pub fn run(argv : ArrayView[String]) -> Int32 {
   }
   match argv[1] {
     "generate" => run_generate(argv)
+    "fmt" => run_format(argv)
     other => {
       eprintln("moon-templ: unknown command `" + other + "`")
       eprintln("usage: " + USAGE)

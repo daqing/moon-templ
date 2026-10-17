@@ -3,8 +3,16 @@ fn el(
   name : String,
   children : Array[@parser.Node],
   self_closing : Bool,
+  indent_children~ : Bool = false,
 ) -> @parser.Node {
-  Element({ name, attrs: [], children, self_closing, })
+  Element({
+    name,
+    attrs: [],
+    children,
+    self_closing,
+    indent_attrs: false,
+    indent_children,
+  })
 }
 
 ///|

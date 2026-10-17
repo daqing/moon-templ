@@ -84,6 +84,7 @@ test "normalizing a loop normalizes its body" {
           Text("text"),
         ],
         false,
+        indent_children=true,
       ),
     ],
   )

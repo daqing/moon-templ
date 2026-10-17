@@ -49,6 +49,8 @@ test "a children block holds nodes" {
         attrs: [],
         children: [Text("x")],
         self_closing: false,
+        indent_attrs: false,
+        indent_children: false,
       }),
     ]),
   ])

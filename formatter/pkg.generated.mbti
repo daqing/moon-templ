@@ -1,0 +1,19 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "daqing/moon-templ/formatter"
+
+import {
+  "daqing/moon-templ/parser",
+}
+
+// Values
+pub fn format_source(String) -> String raise @parser.ParseError
+
+pub fn format_template(@parser.Template) -> String
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

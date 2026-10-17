@@ -2,7 +2,11 @@
 package "daqing/moon-templ/cli"
 
 // Values
-pub const USAGE : String = "moon-templ generate <file.templ>\n       moon-templ generate <dir>/..."
+pub const USAGE : String = "moon-templ generate <file.templ>\n       moon-templ generate <dir>/...\n       moon-templ fmt <file.templ>\n       moon-templ fmt <dir>/..."
+
+pub fn format_file(String) -> Formatted raise CliError
+
+pub fn format_tree(String) -> Int raise CliError
 
 pub fn generate_file(String) -> Generated raise CliError
 
@@ -24,6 +28,11 @@ pub(all) suberror CliError {
 }
 
 // Types and methods
+pub(all) enum Formatted {
+  Written(path~ : String)
+  Unchanged(path~ : String)
+}
+
 pub(all) enum Generated {
   Written(path~ : String)
   Unchanged(path~ : String)

@@ -59,6 +59,26 @@ test "a file that cannot be read fails the command" {
 }
 
 ///|
+test "fmt without a file is a usage error" {
+  assert_eq(@cli.run(["moon-templ", "fmt"]), 1)
+}
+
+///|
+test "fmt with more than one file is a usage error" {
+  assert_eq(@cli.run(["moon-templ", "fmt", "a.templ", "b.templ"]), 1)
+}
+
+///|
+test "fmt on a file that cannot be read fails the command" {
+  assert_eq(@cli.run(["moon-templ", "fmt", "no-such-template.templ"]), 1)
+}
+
+///|
+test "fmt over a directory with no templates fails" {
+  assert_eq(@cli.run(["moon-templ", "fmt", "parser"]), 1)
+}
+
+///|
 /// `./...` is the spelling the Go tools use for a whole tree, and a bare
 /// directory names one too; anything else is a single file.
 test "a tree argument names a directory, not a file" {

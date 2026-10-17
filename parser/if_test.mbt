@@ -150,6 +150,7 @@ test "normalizing an if normalizes every branch" {
           Text("text"),
         ],
         false,
+        indent_children=true,
       ),
     ],
   )

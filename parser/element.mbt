@@ -277,8 +277,19 @@ fn parse_element(
   }
   let name = name_buf.to_string()
   let (attrs, after_attrs, self_closing) = parse_attributes(after_name, offset)
+  let indent_attrs = newline_between(after_name, after_attrs)
   if self_closing || is_void_element(name) {
-    return (Element({ name, attrs, children: [], self_closing, }), after_attrs)
+    return (
+      Element({
+        name,
+        attrs,
+        children: [],
+        self_closing,
+        indent_attrs,
+        indent_children: false,
+      }),
+      after_attrs,
+    )
   }
   let close = "</" + name + ">"
   let (children, at_close) = parse_nodes(
@@ -290,7 +301,39 @@ fn parse_element(
     [] => raise ParseError(offset~, message="unclosed element <" + name + ">")
     _ => drop_prefix(at_close, close[:])
   }
-  (Element({ name, attrs, children, self_closing: false, }), rest)
+  (
+    Element({
+      name,
+      attrs,
+      children,
+      self_closing: false,
+      indent_attrs,
+      indent_children: newline_between(after_attrs, at_close),
+    }),
+    rest,
+  )
+}
+
+///|
+/// Whether a newline stands anywhere between `from` and `to`, two views of the
+/// same source with `to` later. The parser uses it to record whether an
+/// element's attributes or children were laid out over several lines, which is
+/// the one thing about the source's layout the AST keeps: everything else about
+/// the layout is whitespace, and whitespace is normalized away.
+fn newline_between(from : StringView, to : StringView) -> Bool {
+  match from.get_view(end=consumed(from, to)) {
+    Some(view) => contains_newline(view)
+    None => false
+  }
+}
+
+///|
+fn contains_newline(view : StringView) -> Bool {
+  match view {
+    [] => false
+    ['\n', ..] => true
+    [_, .. rest] => contains_newline(rest)
+  }
 }
 
 ///|
@@ -343,7 +386,14 @@ fn parse_raw_element(
   // `<style/>` is not a raw element at all; it closes itself on the spot.
   if self_closing {
     return (
-      Element({ name, attrs, children: [], self_closing: true, }),
+      Element({
+        name,
+        attrs,
+        children: [],
+        self_closing: true,
+        indent_attrs: newline_between(after_name, after_open),
+        indent_children: false,
+      }),
       after_open,
     )
   }

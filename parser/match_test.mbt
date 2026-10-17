@@ -121,6 +121,7 @@ test "normalizing a match normalizes every arm" {
           Text("text"),
         ],
         false,
+        indent_children=true,
       ),
     ],
   )

@@ -83,7 +83,17 @@ fn parse_template(
       )
     _ => drop_prefix(at_close, "}"[:])
   }
-  ({ name, receiver, params, nodes: normalize_whitespace(nodes), }, rest)
+  (
+    {
+      name,
+      receiver,
+      params,
+      nodes: normalize_whitespace(nodes),
+      start: offset,
+      end: offset + consumed(view, rest),
+    },
+    rest,
+  )
 }
 
 ///|

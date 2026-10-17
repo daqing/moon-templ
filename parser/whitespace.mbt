@@ -151,6 +151,8 @@ fn collect(node : Node, out : Array[Piece]) -> Unit {
             attrs: e.attrs,
             children: normalize(e.children, block=false, after=None),
             self_closing: e.self_closing,
+            indent_attrs: e.indent_attrs,
+            indent_children: e.indent_children,
           }),
         ),
       )

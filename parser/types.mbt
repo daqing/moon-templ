@@ -95,6 +95,14 @@ pub(all) struct Element {
   attrs : Array[Attribute]
   children : Array[Node]
   self_closing : Bool
+  /// The attributes were laid out on lines of their own in the source, which is
+  /// where the formatter puts them too.
+  indent_attrs : Bool
+  /// The element's tags and its children were on different lines in the source,
+  /// which is where the formatter puts the children too. False keeps an element
+  /// whose children share its line — `Hello, { name }!` — on one line, so that
+  /// formatting never turns a space into a line break or the other way round.
+  indent_children : Bool
 } derive(Debug, Eq)
 
 ///|
@@ -136,11 +144,18 @@ pub(all) enum Attribute {
 /// the parameter list, e.g. `name : String`, and is copied verbatim into the
 /// generated function header. `receiver` holds the `templ (self : T) Name()`
 /// form the same way, and is empty for a plain function.
+///
+/// `start` and `end` are the UTF-16 offsets of the `templ` keyword and of the
+/// character after the block's closing brace. They let a tool that rewrites the
+/// blocks — the formatter — keep the file's other bytes, comments included, as
+/// they were.
 pub(all) struct Template {
   name : String
   receiver : String
   params : String
   nodes : Array[Node]
+  start : Int32
+  end : Int32
 } derive(Debug, Eq)
 
 ///|
