@@ -4,7 +4,7 @@
 拆分日期:2026-10-17
 目标:把 `a-h/templ` 的模板引擎在 MoonBit 中重新实现
 
-**进度:52 / 58**
+**进度:53 / 58**
 
 ---
 
@@ -20,7 +20,7 @@
   | T2 parser + generator 骨架 | 19 | 19 | 0 |
   | T3 MVP 完整 | 11 | 11 | 0 |
   | T4 属性特殊语义 | 8 | 8 | 0 |
-  | T5 工具链与打磨 | 5 | 4 | 1(T5.5) |
+  | T5 工具链与打磨 | 5 | 5 | 0 |
   | T6 可选 / 远期 | 5 | 0 | 3 |
 
 - **每个任务独立可交付。** commit message 以任务号开头,例如 `T2.3: parse element open/close tags`。
@@ -117,7 +117,7 @@
   - **为什么不去补这个保证**:折行的另一半触发源是**抄进产物的用户表达式**(`{ some_long_call(a, b, c) }` 原样进产物),它的长度生成器管不着。要么内联 formatter(T2.16 已否决,版式对不上),要么就是排除。所以补字面量切分只能修一半,不值得引入一个写死 80 这种魔数的逻辑。
   - **`formatter(ignore:)` 的两个实测结论**:有效 —— 列进去的文件原样不动;**不支持 glob** —— 写 `"*_templ.mbt"` 那个文件照样被格式化。所以每个生成文件都得单列一行(与 §3.3 里 `pre-build` 的 `input` 是同一个痛点)。
   - 落点:`examples/hello/moon.pkg` 加上 `formatter(ignore: ["hello_templ.mbt"])`,这是用户会照抄的样板;port-research §6.1 整段改写,§3.3 与风险表同步纠正;TASKS.md 里 T2.15/T2.16 两条断言"不动点"的措辞一并改掉。
-  - README 部分**留给 T5.5**:当前 `README.md` / `README.mbt.md` 只有一行标题,写文档是 T5.5 的整块工作,不在这里顺手起个头。
+  - README 部分**留给 T5.5**:当时 `README.md` / `README.mbt.md` 只有一行标题,写文档是 T5.5 的整块工作,不在这里顺手起个头。
 - [x] **T2.18** 大写模板名生成非法 MoonBit — 生成期明确报错,templ 侧允许 `templ Hello()` 而 MoonBit 的 `fn` 名必须小写写起。**实测证据**:`templ Hello()` 产出 `pub fn Hello() -> Unit` → `Parse error, unexpected token `(`, you may expect `::``;带接收者的 `templ (m : Model) Render()` 产出 `pub fn Model::Render(...)` → `Expected lower case identifier for name of `fn``。报错要指出是模板名的大小写问题并给出模板名与位置,不要让它变成用户看不懂的产物编译错误 · 前置 T2.15 · S
   - 新增 `Generator::check_name`,在 `write_template` 一开头、**写任何东西之前**调用(所以报错里的名字就是源码里的那个,不会指向半成品产物)。判据是**首字符必须是 `a`–`z` 或 `_`**,与实测一致:`pub fn _leading()` / `pub fn foo_bar()` / `pub fn fooBar2()` 都合法,`pub fn Hello()` 与 `pub fn 9lives()` 都是 parse error(MoonBit 解析器把首字母大写当类型名)。名字**中间**的大写不管。
   - 报错文案:`a template name must start with a lowercase letter or `_`, because it becomes a MoonBit function name, but this one is `Hello` (in template `Hello`)`。带接收者的模板走同一条规则(方法名同样不能大写)。
@@ -282,7 +282,10 @@
   - 新增 `.github/workflows/ci.yml`:push / pull_request 触发,装好 MoonBit 后跑 `moon check --deny-warn` 与 `moon test --deny-warn`。产物 `*_templ.mbt` 就在各自包里参与编译,所以"门禁覆盖到产物"不需要单独的命令 —— 生成器一旦吐出未使用参数、`unused_value`、`StringBuilder::new()` 这类警告,CI 直接红。
   - 产物是否与生成器当前输出一致由既有护栏保证(`cli/checked_in_wbtest.mbt` 逐一比对已入库产物、`every template in the tree` 防漏登记),因此过期产物不会让门禁变成"只校验旧文件"。
   - 本地实测两条命令均以 0 退出(wasm-gc 默认目标);`moon check --target native` 同样零警告。工作流 YAML 用 Ruby 的 YAML 解析验证过语法。
-- [ ] **T5.5** 文档与示例完善 — 双语文档;pre-build 接线示例;与 templ 的差异清单 · 前置 T3.9 · M
+- [x] **T5.5** 文档与示例完善 — 双语文档;pre-build 接线示例;与 templ 的差异清单 · 前置 T3.9 · M
+  - 英文文档写在 `README.mbt.md`(仓库里 `README.md` 是指向它的符号链接,两种入口都可读),中文版为 `README.zh-CN.md`,两份内容一一对应。覆盖:安装(含 native 构建 CLI 并放进 `PATH`)、快速上手(`hello.templ` → 生成 → `moon.pkg` 的 `@rt` 导入与 `formatter(ignore:)`)、模板语法(表达式、属性各形态、`if` / `for` / `match`、组件调用、raw 元素与 `{{ }}`)、命令(`generate` / `fmt` / `--watch`,含 native 限制)、构建集成、与 templ 的差异表、开发命令与包结构。
+  - 构建集成两种模式都写明:提交产物(与 templ 一致),或在 `moon.pkg` 里用 `rule` + `dev_build` 在构建时生成。后者**已实测**:在 `examples/hello/moon.pkg` 临时加上一条 `rule`(`moon-templ generate $input`)与一条 `dev_build`,`moon build --target native examples/hello` 重新生成了 `hello_templ.mbt`,产物与已提交版本逐字节一致,且输入不变时不重跑;验证后已原样还原 `moon.pkg`。限制也记下:`input` 不能是目录或通配符(每个模板一条 `dev_build`),不能与旧的 `pre-build` 选项混用。
+  - `moon.mod` 的 `readme` 保持 `README.mbt.md`:它是真实文件,`README.md` 只是链接;这样文档里的代码块仍可被 MoonBit 的文档测试捡起。`moon test` 仍为 **428 passed / 0 failed**,`moon check --deny-warn` 通过。
 
 ---
 
