@@ -4,7 +4,7 @@
 拆分日期:2026-10-17
 目标:把 `a-h/templ` 的模板引擎在 MoonBit 中重新实现
 
-**进度:50 / 58**
+**进度:51 / 58**
 
 ---
 
@@ -20,7 +20,7 @@
   | T2 parser + generator 骨架 | 19 | 19 | 0 |
   | T3 MVP 完整 | 11 | 11 | 0 |
   | T4 属性特殊语义 | 8 | 8 | 0 |
-  | T5 工具链与打磨 | 5 | 2 | 1(T5.3) |
+  | T5 工具链与打磨 | 5 | 3 | 1(T5.4) |
   | T6 可选 / 远期 | 5 | 0 | 3 |
 
 - **每个任务独立可交付。** commit message 以任务号开头,例如 `T2.3: parse element open/close tags`。
@@ -272,7 +272,12 @@
   - **修掉一个真实 bug**:相邻语句被粘成 `}for` / `}match`。断行安全性此前把 `If`/`For`/`Match` 当内联节点(`is_inline` 的口径),于是认为断行会凭空多出空格;实际上语句的尾随空白归列表所有,非 block 列表会丢掉它。改成与 `normalizer` 的 `leaves_trailing_space_to_list` 同一口径后恢复正常。
   - 三道语料护栏 `cli/format_wbtest.mbt`(遍历 13 个已入库模板):已格式化文件**不动点**、二次格式化**幂等**、格式化前后的**生成产物逐字节相同**。另有 `formatter/formatter_test.mbt` 9 条精确输出断言(缩进、语句、调用、属性、raw element、自闭合、接收者、块间文本、无模板文件)与 4 条 CLI `fmt` 用法/错误测试。
   - `raw element`(`<style>` / `<script>`)的内容原样写出、不重新缩进,因为那段内容对模板语法不可见;`moon check` 零警告;`moon test` **424 passed / 0 failed**(较 T5.1 的 408 多出 16:formatter 9 + CLI fmt 4 + 语料 3)。
-- [ ] **T5.3** `--watch` 热生成 — 改 `.templ` 后自动重新生成 · 前置 T3.9 · M
+- [x] **T5.3** `--watch` 热生成 — 改 `.templ` 后自动重新生成 · 前置 T3.9 · M
+  - 用法:`moon-templ generate --watch <dir>/...`。先整树生成一遍,再每 250 ms 取一次 `Snapshot`(路径 → 文件内容),只重新生成**新增或内容变化**的文件;坏模板只报错、不退出循环,下次改动还能继续。
+  - 轮询而不是操作系统事件:树很小,读一遍的成本远低于生成;好处是不用为每个平台写文件监听。快照与差异计算(`snapshot` / `Snapshot::changed`)是纯函数,直接单测,不依赖计时。
+  - **计时只能落在 native**:MoonBit 的 `@sys` 与 `moonbitlang/x` 都没有 sleep,用 C FFI 绑 `usleep`;`cli/moon.pkg` 用 `options(targets:)` 把实现分成 `watch_native.mbt` 与 `watch_other.mbt`,后者在进入循环前就明确拒绝:"watch mode needs the native target"。这也意味着 `moon run cmd/main -- generate --watch ...` 需加 `--target native`。
+  - 参数解析顺带升级:`generate` 现在接受选项,未知选项(如 `--frobnicate`)报错退出;两个路径仍然算用法错误。
+  - 实测:在暂存目录起 watcher,改 `hello.templ` 的文案,一个轮询周期内 `hello_templ.mbt` 就带上了新文本并重启进程验证了 native 构建;wasm-gc 下的拒绝路径退出码为 1。`moon check`(wasm-gc 与 native)零警告;`moon test` **428 passed / 0 failed**(较 T5.2 的 424 多出 4)。
 - [ ] **T5.4** 零警告 CI 门禁 — CI 断言生成产物编译时**无警告**(port-research §3.2.1 的五类)· 前置 T2.16 · S
 - [ ] **T5.5** 文档与示例完善 — 双语文档;pre-build 接线示例;与 templ 的差异清单 · 前置 T3.9 · M
 

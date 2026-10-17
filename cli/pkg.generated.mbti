@@ -2,7 +2,7 @@
 package "daqing/moon-templ/cli"
 
 // Values
-pub const USAGE : String = "moon-templ generate <file.templ>\n       moon-templ generate <dir>/...\n       moon-templ fmt <file.templ>\n       moon-templ fmt <dir>/..."
+pub const USAGE : String = "moon-templ generate <file.templ>\n       moon-templ generate <dir>/...\n       moon-templ generate --watch <dir>/...\n       moon-templ fmt <file.templ>\n       moon-templ fmt <dir>/..."
 
 pub fn format_file(String) -> Formatted raise CliError
 
@@ -17,6 +17,8 @@ pub fn is_tree_argument(String) -> Bool
 pub fn output_path(String) -> String
 
 pub fn run(ArrayView[String]) -> Int
+
+pub fn snapshot(String) -> Snapshot raise CliError
 
 pub fn templ_files_under(String) -> Array[String] raise CliError
 
@@ -37,6 +39,11 @@ pub(all) enum Generated {
   Written(path~ : String)
   Unchanged(path~ : String)
 }
+
+pub(all) struct Snapshot {
+  files : Map[String, String]
+}
+pub fn Snapshot::changed(Self, Self) -> Array[String]
 
 // Type aliases
 

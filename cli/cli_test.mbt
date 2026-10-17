@@ -59,6 +59,43 @@ test "a file that cannot be read fails the command" {
 }
 
 ///|
+fn snapshot_of(entries : Array[(String, String)]) -> @cli.Snapshot {
+  let files : Map[String, String] = Map([])
+  for entry in entries {
+    files[entry.0] = entry.1
+  }
+  @cli.Snapshot::{ files, }
+}
+
+///|
+test "a snapshot finds the templates that are new or edited" {
+  let before = snapshot_of([("a.templ", "same"), ("b.templ", "one")])
+  let after = snapshot_of([
+    ("a.templ", "same"),
+    ("b.templ", "two"),
+    ("c.templ", "new"),
+  ])
+  assert_eq(before.changed(after), ["b.templ", "c.templ"])
+}
+
+///|
+test "a tree that did not change has nothing to regenerate" {
+  let files = @cli.snapshot("examples")
+  assert_eq(files.changed(files), [])
+}
+
+///|
+test "watch refuses a path that is not a directory" {
+  assert_eq(@cli.run(["moon-templ", "generate", "--watch", "hello.templ"]), 1)
+  assert_eq(@cli.run(["moon-templ", "generate", "--watch", "no-such-dir"]), 1)
+}
+
+///|
+test "an unknown option is refused" {
+  assert_eq(@cli.run(["moon-templ", "generate", "--frobnicate", "examples"]), 1)
+}
+
+///|
 test "fmt without a file is a usage error" {
   assert_eq(@cli.run(["moon-templ", "fmt"]), 1)
 }

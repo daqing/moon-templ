@@ -4,3 +4,10 @@ import {
   "daqing/moon-templ/formatter",
   "moonbitlang/x/fs",
 }
+
+options(
+  targets: {
+    "watch_native.mbt": [ "native", "llvm" ],
+    "watch_other.mbt": [ "wasm", "wasm-gc", "js" ],
+  },
+)

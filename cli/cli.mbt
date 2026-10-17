@@ -7,6 +7,7 @@ pub(all) suberror CliError {
 ///|
 pub const USAGE : String = "moon-templ generate <file.templ>\n" +
   "       moon-templ generate <dir>/...\n" +
+  "       moon-templ generate --watch <dir>/...\n" +
   "       moon-templ fmt <file.templ>\n" +
   "       moon-templ fmt <dir>/..."
 
@@ -213,6 +214,98 @@ pub fn generate_tree(root : String) -> Int32 raise CliError {
 }
 
 ///|
+/// What every template under a root held when it was last looked at. The watch
+/// loop compares one snapshot with the next to find the files that moved.
+pub(all) struct Snapshot {
+  files : Map[String, String]
+}
+
+///|
+/// Read every `.templ` file under `root`, keyed by path.
+pub fn snapshot(root : String) -> Snapshot raise CliError {
+  let files : Map[String, String] = Map([])
+  for path in templ_files_under(root) {
+    files[path] = read(path)
+  }
+  Snapshot::{ files, }
+}
+
+///|
+/// The paths that are new in `next` or whose text differs from `self`, in name
+/// order so a batch reports them the same way every time.
+pub fn Snapshot::changed(self : Snapshot, next : Snapshot) -> Array[String] {
+  let out : Array[String] = []
+  for path, content in next.files {
+    let differs = match self.files.get(path) {
+      Some(before) => before != content
+      None => true
+    }
+    if differs {
+      out.push(path)
+    }
+  }
+  out.sort_by(fn(a, b) { a[:].lexical_compare(b[:]) })
+  out
+}
+
+///|
+/// How often the watch loop looks at the tree.
+const WATCH_INTERVAL_MS : Int32 = 250
+
+///|
+/// Generate one file during a watch, reporting what happened and the failure
+/// rather than raising it: one broken template should not stop the loop.
+fn generate_reporting(file : String) -> Unit {
+  println(report(generate_file(file))) catch {
+    CliError(message~) => eprintln("moon-templ: " + message)
+  }
+}
+
+///|
+/// A snapshot, or `None` after the error was reported. A tree that cannot be
+/// read this time may be readable the next one, so the watch loop keeps going.
+fn snapshot_reporting(root : String) -> Snapshot? {
+  Some(snapshot(root)) catch {
+    CliError(message~) => {
+      eprintln("moon-templ: " + message)
+      None
+    }
+  }
+}
+
+///|
+/// Generate every template under `root`, then keep doing so as they change,
+/// until the process is interrupted.
+///
+/// The loop polls instead of asking the operating system for change events: the
+/// tree a person edits holds a handful of templates, and reading them costs
+/// little next to the generation they ask for. Polling also keeps the command
+/// free of platform-specific code, apart from the pause itself.
+fn watch_tree(root : String, interval_ms : Int32) -> Unit raise CliError {
+  let files = templ_files_under(root)
+  if files.is_empty() {
+    raise CliError(message="no .templ files under " + root)
+  }
+  for file in files {
+    generate_reporting(file)
+  }
+  println("watching " + root + " for changes")
+  let mut previous = snapshot(root)
+  while true {
+    pause(interval_ms)
+    match snapshot_reporting(root) {
+      Some(next) => {
+        for file in previous.changed(next) {
+          generate_reporting(file)
+        }
+        previous = next
+      }
+      None => ()
+    }
+  }
+}
+
+///|
 /// What one format run did to a file.
 pub(all) enum Formatted {
   Written(path~ : String)
@@ -332,12 +425,48 @@ pub fn run(argv : ArrayView[String]) -> Int32 {
 
 ///|
 fn run_generate(argv : ArrayView[String]) -> Int32 {
-  if argv.length() != 3 {
-    eprintln("usage: " + USAGE)
-    return 1
+  let mut watch = false
+  let mut argument : String? = None
+  for i = 2; i < argv.length(); i = i + 1 {
+    let value = argv[i]
+    if value == "--watch" {
+      watch = true
+    } else if value.has_prefix("-") {
+      eprintln("moon-templ: unknown option `" + value + "`")
+      eprintln("usage: " + USAGE)
+      return 1
+    } else if argument is Some(_) {
+      eprintln("usage: " + USAGE)
+      return 1
+    } else {
+      argument = Some(value)
+    }
   }
-  let argument = argv[2]
+  let argument = match argument {
+    Some(value) => value
+    None => {
+      eprintln("usage: " + USAGE)
+      return 1
+    }
+  }
   try {
+    if watch {
+      let root = if is_tree_argument(argument) {
+        tree_root(argument)
+      } else {
+        argument
+      }
+      if !is_dir(root) {
+        raise CliError(message="watch needs a directory, not " + argument)
+      }
+      if !watch_supported() {
+        raise CliError(
+          message="watch mode needs the native target: `moon run --target native`",
+        )
+      }
+      watch_tree(root, WATCH_INTERVAL_MS)
+      return 0
+    }
     if is_tree_argument(argument) {
       return if generate_tree(tree_root(argument)) == 0 { 0 } else { 1 }
     }
