@@ -66,6 +66,11 @@ pub fn Component::to_string(Self) -> String
 pub fn Component::with_children(Self, Self) -> Self
 pub impl Show for Component
 
+pub(all) struct ComponentScript {
+  call : String
+}
+pub fn ComponentScript::new(String) -> Self
+
 pub(all) struct KV[K, V] {
   key : K
   value : V

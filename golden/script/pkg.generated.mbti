@@ -1,0 +1,29 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "daqing/moon-templ/golden/script"
+
+import {
+  "daqing/moon-templ/runtime",
+}
+
+// Values
+pub fn button(String, @runtime.ComponentScript, @runtime.ComponentScript) -> @runtime.Component
+
+pub fn case_folding(String) -> @runtime.Component
+
+pub fn constants() -> @runtime.Component
+
+pub fn event_attributes(@runtime.ComponentScript) -> @runtime.Component
+
+pub fn when_button_is_clicked() -> @runtime.ComponentScript
+
+pub fn with_parameters() -> @runtime.ComponentScript
+
+pub fn without_parameters() -> @runtime.ComponentScript
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

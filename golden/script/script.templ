@@ -1,0 +1,18 @@
+templ button(text : String, on_click : @rt.ComponentScript, on_mouseover : @rt.ComponentScript) {
+  <button onClick={ on_click } onMouseover={ on_mouseover } type="button">{ text }</button>
+}
+
+templ event_attributes(handler : @rt.ComponentScript) {
+  <button hx-on::click={ handler } type="button">Button E</button>
+  <button onclick={ handler }>Button F</button>
+}
+
+templ constants() {
+  <button onMouseover="console.log('mouseover')" type="button">Button C</button>
+  <button hx-on::click="alert('clicked inline')" type="button">Button D</button>
+}
+
+templ case_folding(value : String) {
+  <button OnClick={ value }>Upper</button>
+  <button data-on={ value }>Data</button>
+}

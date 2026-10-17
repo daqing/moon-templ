@@ -4,7 +4,7 @@
 拆分日期:2026-10-17
 目标:把 `a-h/templ` 的模板引擎在 MoonBit 中重新实现
 
-**进度:45 / 58**
+**进度:46 / 58**
 
 ---
 
@@ -19,7 +19,7 @@
   | T1 runtime 地基 | 5 | 5 | 0 |
   | T2 parser + generator 骨架 | 19 | 19 | 0 |
   | T3 MVP 完整 | 11 | 11 | 0 |
-  | T4 属性特殊语义 | 8 | 5 | 0 |
+  | T4 属性特殊语义 | 8 | 6 | 0 |
   | T5 工具链与打磨 | 5 | 0 | 1(T5.2) |
   | T6 可选 / 远期 | 5 | 0 | 3 |
 
@@ -218,7 +218,16 @@
   - golden:`golden/url/` 移植 `generator/test-a-href` 与 `generator/test-form-action`(前者 3 个 `<a>`,后者 5 个 `<form>`,含两个"函数返回值"形态)。两个 Go 版的辅助函数返回 `(T, error)`,这里没有错误,于是 `safe_url` / `string_url` 只在返回类型上有别。另加两个 golden 没覆盖的:`link[href]` + `object[data]`,以及反例 `img[src]` + `a[title]`。
   - golden 的断言是**逐字对齐真 templ 渲染结果**的:`a-href` 与 `form-action` 两段输出(含元素之间的空格 —— `<a>` 是 inline 所以留空格、`<form>` 是 block 所以不留)与真 templ 渲染逐字节相同;`link/object` 与 `img/title` 那两个模板在临时模块里用 `templ generate` 生成后渲染,同样逐字节相同。golden 的 `expected.html` 是给人看的写法,它对的是 HTML diff,不是字节。
   - `moon check` 零警告;`moon test` **368 passed / 0 failed**(较 T4.4 的 362 多出 6:运行时 3 + 生成器 2 + golden 1)。
-- [ ] **T4.6** 事件属性 `on*` / `hx-on:*` → `ComponentScript` — 输出 `.Call` 而非转义值 · 前置 T4.1 · M
+- [x] **T4.6** 事件属性 `on*` / `hx-on:*` → `ComponentScript` — 输出 `.Call` 而非转义值 · 前置 T4.1 · M
+  - 规则是 templ 的 `isScriptAttribute(name)`(`generator.go:1130`):**前缀匹配**,`on` 与 `hx-on:` 两个前缀各判一次。前缀匹配比"事件属性"宽:实测 `once`、`on-click` 都算,照搬。名字**不折叠**,所以 `OnClick` 不算 —— 见下面那条 templ 的 bug。
+  - 落法是 `attribute_value_expression(element, name, expr)` 一个函数把 templ `writeExpressionAttribute` 的**四路顺序(URL → script → style → 默认)照原样**写在一处,替换 T4.4 的 `attribute_value_call`。前三路里只有 script 一路的**形状**不同:表达式要以 `ComponentScript` 作答,写进去的是它的 `call`;其余三路仍是 `@rt.xxx(expr)` 包一层。templ 那里先 `var vn templ.ComponentScript = <expr>` 再 `Buffer.WriteString(vn.Call)`,那句声明就是它的类型检查;这里 `.call` 字段访问起同样作用,给错类型编译期就报错。
+  - **`.Call` 不再转义一次**是这条规则的实质:templ 的 `SafeScript(name, params...)` 在构造 call 时就把每个参数 JSON 编码、再对整条 call 做一次属性转义,所以字符串参数的引号到达属性时已经是 `&#34;`;写出时**原样**写。再转义一次会变成 `&amp;#34;`,浏览器就会把 `&#34;` 当字面文本 —— golden 里 `withParameters` 那条断言正是钉这个(与真 templ 逐字节一致)。
+  - 常量属性不走这条路:templ 只读表达式产生的值,常量 `onclick="alert(1)"` 照原样写。templ 的 `test-script-usage` 里 Button C / Button D 两个常量按钮就是这个样子,已抄进 golden。
+  - 新增运行时类型 `ComponentScript { call : String }`(templ 的 `Name` / `Function` / `CallInline` 与 `RenderScriptItems` 属于 T6.2,这里刻意不做)。它**特意没有实现 `Show`**:templ 的 `ResolveAttributeValue` 里有一条 `case ComponentScript: return v.Call`(runtime.go:702,**不转义**),所以它的 `OnClick={ handler }` 一样能渲染出 call;本项目 `resolve_attribute_value[T : Show]` 走的是 `escape(show(v))`,给 `ComponentScript` 实现 `Show` 就会**多转义一次**,渲染结果与 templ 相反。宁可让这种模板**编译不过**(属性名没说这个值是脚本,就不该往里放脚本),也不静默渲染出坏掉的 JS —— 这是刻意与 templ 分道的一处,已记在 golden 的测试注释里。
+  - **顺带查实 templ 的一个 bug**:`getAttributeScripts`(`generator.go:1166`)收集要内联的 `<script>` 定义时用的是同一个 `isScriptAttribute`,同样不折叠大小写。实测 `<button OnClick={ onClick() }>` 渲染出 `OnClick="__templ_onClick_657d()"` 却**没有**配套的 `<script>function __templ_onClick_657d(){…}</script>`(而 `onClick` 有),页面调用一个不存在的函数。本项目把这层定义留给 T6.2,到时同样按前缀判定。
+  - **差分校验**:Go 探针(`templ.ComponentScript{Call: templ.SafeScript(...)}` 手工构造,绕开 script 块)把四种模板形状渲染一遍,逐字节作为 golden 断言:两个 `onClick` / `onMouseover`、`hx-on::click` + `onclick` 两个按钮、两个常量按钮、以及反例 `OnClick` + `data-on`(值用 `a<b`,确认走转义)。另用 `templ.ResolveAttributeValue` 直接确认了那条不转义的 `case ComponentScript`,以及 `OnClick={ script() }` 缺 `<script>` 定义的现象。
+  - golden:`golden/script/`(四个模板),其中的 call 字符串按 templ `SafeScript` 的产物手写 —— script 块本身留给 T6.2,golden 只钉属性侧规则。已在 `cli/checked_in_wbtest.mbt` 登记。
+  - `moon check` 零警告;`moon test` **376 passed / 0 failed**(较 T4.5 的 368 多出 8:生成器 3 + golden 5)。
 - [ ] **T4.7** 布尔表达式属性 `name?={ expr }` — 假值时整个属性消失 · 前置 T3.1 · S
 - [ ] **T4.8** 条件属性 `if expr { attrs } else { attrs }` — 两个分支各有快照 · 前置 T3.4、T3.1 · M
 

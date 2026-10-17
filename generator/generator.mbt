@@ -794,8 +794,9 @@ fn Generator::write_spread_attribute(
 }
 
 ///|
-/// An expression attribute is written as the escaped value of the expression,
-/// inside quotes the generator emits itself. The runtime escapes it, so it goes
+/// An expression attribute is written as the value of the expression, inside
+/// quotes the generator emits itself. What that value is depends on the
+/// attribute, and for all but a script attribute it is escaped text, which goes
 /// out through `write_string` rather than through `write_any`.
 fn Generator::write_expression_attribute(
   self : Generator,
@@ -828,31 +829,52 @@ fn Generator::write_expression_attribute(
   self.w.write_literal(level, " " + name + "=\"")
   self.w.write_indent(
     level,
-    "w.write_string(@rt." +
-    attribute_value_call(name, element) +
-    "(" +
-    expr +
-    "))\n",
+    "w.write_string(" + attribute_value_expression(element, name, expr) + ")\n",
   )
   self.w.write_literal(level, "\"")
 }
 
 ///|
-/// The call an expression attribute's value goes through, which is templ's
-/// `writeExpressionAttribute` choosing between its four writers. Two of them
-/// differ from the plain escape, and both are picked by name: a URL attribute
-/// goes through the whitelist, and a `style` attribute through the sanitizer.
-///
-/// templ's own order is URL first, then script, then `style`, then the default.
-/// The script writer is T4.6 and is missing here rather than forgotten.
-fn attribute_value_call(name : String, element : String) -> String {
+/// What the value of an expression attribute is written from, which is templ's
+/// `writeExpressionAttribute` choosing between its four writers, in its order:
+/// URL, script, `style`, then the default. Only the script writer differs in
+/// shape rather than merely in the call it makes — its expression is expected to
+/// answer a `ComponentScript`, and what goes between the quotes is that script's
+/// `call`, already escaped. templ declares a variable of the type first
+/// (`var vn templ.ComponentScript = <expr>`), which is how a template that hands
+/// over something else is refused; here the field access says the same thing.
+fn attribute_value_expression(
+  element : String,
+  name : String,
+  expr : String,
+) -> String {
   if is_url_attribute(element, name) {
-    "sanitize_url"
+    "@rt.sanitize_url(" + expr + ")"
+  } else if is_script_attribute(name) {
+    "(" + expr + ").call"
   } else if name == "style" {
-    "sanitize_style_attribute_value"
+    "@rt.sanitize_style_attribute_value(" + expr + ")"
   } else {
-    "resolve_attribute_value"
+    "@rt.resolve_attribute_value(" + expr + ")"
   }
+}
+
+///|
+/// Whether an attribute holds JavaScript to run rather than a value to write:
+/// templ's `isScriptAttribute`, which is a prefix test, so every `on…` is one
+/// and so is `hx-on:…`.
+///
+/// A prefix test means more than the event attributes a reader has in mind: `on`,
+/// `once` and `onward` are all script attributes here, exactly as they are in
+/// templ. A name is not folded — `OnClick` is not one — while an attribute name's
+/// characters are the parser's business, and `hx-on::click` is one name, colons
+/// and all.
+///
+/// Only an expression attribute reaches this: a constant `onclick="alert(1)"` is
+/// written as it was read, which is what templ does with the constant `onclick`
+/// in its script-usage golden.
+fn is_script_attribute(name : String) -> Bool {
+  name.has_prefix("on") || name.has_prefix("hx-on:")
 }
 
 ///|
